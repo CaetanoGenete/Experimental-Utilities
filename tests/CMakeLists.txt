@@ -7,6 +7,7 @@ set(smm_tests_source_rel_dir "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 set(smm_tests_source_dirs 
     "${PROJECT_NAME}/test_utils.hpp"
     "${PROJECT_NAME}/meta_sort.hpp"
+    "${PROJECT_NAME}/int_iterator.hpp"
 
     "${PROJECT_NAME}/wrappers/disabled_wrapper.hpp"
     "${PROJECT_NAME}/wrappers/disabled_wrapper.cpp"

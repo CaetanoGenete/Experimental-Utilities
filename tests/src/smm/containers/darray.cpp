@@ -6,149 +6,13 @@
 
 #include "test_utils.hpp"
 #include "meta_sort.hpp"
+#include "int_iterator.hpp"
 
 #include "wrappers/disabled_wrapper.hpp"
 #include "wrappers/counted_wrapper.hpp"
 #include "wrappers/counted_allocator.hpp"
 
 namespace smm_tests {
-
-    template<class IntType, class DiffType = std::make_signed_t<IntType>>
-    struct intit {
-    public:
-        //Note: Does not satisfy random_access_iterator concept because of indexing operator.
-        //However, is functionally identical to a random access iterator.
-        using iterator_category = std::random_access_iterator_tag;
-        using value_type        = IntType;
-        using reference         = IntType&;
-        using pointer           = IntType*;
-        using difference_type   = DiffType;
-
-    public:
-
-        constexpr intit() noexcept : _curr() {}
-
-        constexpr intit(IntType value)
-            noexcept(std::is_nothrow_copy_constructible_v<IntType>) :
-            _curr(value) {}
-
-        constexpr intit(const intit&) = default;
-        constexpr intit(intit&&) noexcept = default;
-        constexpr ~intit() noexcept = default;
-
-    public:
-
-        constexpr intit& operator=(const intit&) = default;
-        constexpr intit& operator=(intit&&) noexcept = default;
-
-    public:
-
-        [[nodiscard]] constexpr reference operator*() const noexcept {
-            return _curr;
-        }
-
-        [[nodiscard]] constexpr pointer operator->() const noexcept {
-            return &_curr;
-        }
-
-        [[nodiscard]] constexpr value_type operator[](difference_type n) const noexcept {
-            return static_cast<value_type>(_curr + n);
-        }
-
-    public:
-
-        constexpr intit& operator++() noexcept {
-            ++_curr;
-            return *this;
-        }
-
-        constexpr intit operator++(int) noexcept {
-            intit copy = _curr;
-            ++_curr;
-            return copy;
-        }
-
-        constexpr intit& operator--() noexcept {
-            --_curr;
-            return *this;
-        }
-
-        constexpr intit operator--(int) noexcept {
-            intit copy = _curr;
-            --_curr;
-            return copy;
-        }
-
-    public:
-
-        constexpr intit& operator+=(difference_type n) noexcept {
-            _curr += n;
-            return *this;
-        }
-
-        constexpr intit& operator-=(difference_type n) noexcept {
-            _curr -= n;
-            return *this;
-        }
-
-    public:
-
-        constexpr void swap(intit& other) 
-            noexcept(std::is_nothrow_swappable_v<IntType>) 
-        {
-            using std::swap;
-            swap(other._curr, _curr);
-        }
-
-    private:
-        mutable value_type _curr;
-    };
-
-    template<class IntType, class DiffType>
-    [[nodiscard]] constexpr auto operator<=>(const intit<IntType, DiffType>& lhs, const intit<IntType, DiffType>& rhs) noexcept 
-    {
-        return *lhs <=> *rhs;
-    }
-
-    template<class IntType, class DiffType>
-    [[nodiscard]] constexpr bool operator==(const intit<IntType, DiffType>& lhs, const intit<IntType, DiffType>& rhs) noexcept 
-    {
-        return *lhs == *rhs;
-    }
-
-    template<class IntType, class DiffType>
-    constexpr void swap(intit<IntType, DiffType>& lhs, intit<IntType, DiffType>& rhs) 
-        noexcept(noexcept(lhs.swap(rhs))) 
-    {
-        lhs.swap(rhs);
-    }
-
-    template<class IntType, class DiffType>
-    constexpr intit<IntType, DiffType> operator+(intit<IntType, DiffType> lhs, DiffType n) noexcept 
-    {
-        lhs += n;
-        return lhs;
-    }
-
-    template<class IntType, class DiffType>
-    constexpr intit<IntType, DiffType> operator+(DiffType n, intit<IntType, DiffType> rhs) noexcept 
-    {
-        rhs += n;
-        return rhs;
-    }
-
-    template<class IntType, class DiffType>
-    constexpr intit<IntType, DiffType> operator-(intit<IntType, DiffType> lhs, DiffType n) noexcept 
-    {
-        lhs -= n;
-        return lhs;
-    }
-
-    template<class IntType, class DiffType>
-    constexpr DiffType operator-(const intit<IntType, DiffType>& lhs, const intit<IntType, DiffType>& rhs) noexcept 
-    {
-        return *lhs - *rhs;
-    }
 
     struct inherit_trivial: public std::true_type {};
     struct dont_inherit_trivial : public std::false_type {};
@@ -340,62 +204,96 @@ namespace smm_tests {
 
         constexpr size_t init_size = 50000;
         constexpr size_t assign_size = init_size * 2;
+
+        //Ensures call to copy_constructor
+        smm::darray<TestFixture::counted_int, alloc> temp_cont;
+        temp_cont.reserve(assign_size);
+
+        ASSERT_TRUE(TestFixture::populate_darray(temp_cont, intit<int>(0), intit<int>(assign_size)));
+
         {
             smm::darray<TestFixture::counted_int, alloc> test;
             test.reserve(init_size);
 
             ASSERT_TRUE(TestFixture::populate_darray(test, intit<int>(0), intit<int>(init_size)));
-            
-            smm::darray<TestFixture::counted_int, alloc> temp_cont;
-            temp_cont.reserve(assign_size);
 
-            TestFixture::populate_darray(temp_cont, intit<int>(0), intit<int>(assign_size));
             test.assign(temp_cont.begin(), temp_cont.end());
 
             ASSERT_EQ(test.get_allocator().allocations(), 2);
             ASSERT_EQ(test.get_allocator().deallocations(), 2);
             
-            if constexpr (std::is_trivially_copyable_v<TestFixture::counted_int>) {
-                SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, 0, 0, 0, 0, init_size);
-            }
-            else
-                SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, assign_size, 0, 0, 0, init_size);
+            constexpr size_t expected_copies = std::is_trivially_copyable_v<TestFixture::counted_int> ? 0 : assign_size;
+            SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, expected_copies, 0, 0, 0, init_size);
 
             ASSERT_TRUE(std::equal(test.begin(), test.end(), temp_cont.begin(), temp_cont.end()));
-
-
         }
+
+        ASSERT_EQ(TestFixture::counted_int::destructions_counts(), init_size + assign_size);
     }
 
     TYPED_TEST(darray_tests, assign_case_2) {
         using alloc = counted_allocator<std::allocator<TestFixture::counted_int>>;
 
+        constexpr size_t init_size = 50000;
+        constexpr size_t assign_size = init_size * 2;
+
+        //Ensures call to copy_assignment
+        smm::darray<TestFixture::counted_int, alloc> temp_cont;
+        temp_cont.reserve(assign_size);
+
+        ASSERT_TRUE(TestFixture::populate_darray(temp_cont, intit<int>(0), intit<int>(assign_size)));
+
+        {
+            smm::darray<TestFixture::counted_int, alloc> test;
+            test.reserve(assign_size * 2);
+
+            ASSERT_TRUE(TestFixture::populate_darray(test, intit<int>(0), intit<int>(init_size)));
+
+            test.assign(temp_cont.begin(), temp_cont.end());
+
+            //Expecting NO new allocations
+            ASSERT_EQ(test.get_allocator().allocations(), 1);
+            ASSERT_EQ(test.get_allocator().deallocations(), 1);
+
+            constexpr size_t expected_copies = std::is_trivially_copyable_v<TestFixture::counted_int> ? 0 : assign_size - init_size;
+            SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, expected_copies, 0, init_size, 0, 0);
+
+            ASSERT_TRUE(std::equal(test.begin(), test.end(), temp_cont.begin(), temp_cont.end()));
+        }
+
+        ASSERT_EQ(TestFixture::counted_int::destructions_counts(), assign_size);
+    }
+
+    TYPED_TEST(darray_tests, assign_case_3) {
+        using alloc = counted_allocator<std::allocator<TestFixture::counted_int>>;
+
         constexpr size_t init_size = 100000;
         constexpr size_t assign_size = init_size / 2;
+
+        //Ensures call to copy_assignment
+        smm::darray<TestFixture::counted_int, alloc> temp_cont;
+        temp_cont.reserve(assign_size);
+
+        ASSERT_TRUE(TestFixture::populate_darray(temp_cont, intit<int>(0), intit<int>(assign_size)));
+
         {
             smm::darray<TestFixture::counted_int, alloc> test;
             test.reserve(init_size);
 
             ASSERT_TRUE(TestFixture::populate_darray(test, intit<int>(0), intit<int>(init_size)));
 
-            smm::darray<TestFixture::counted_int, alloc> temp_cont;
-            temp_cont.reserve(assign_size);
-
-            TestFixture::populate_darray(temp_cont, intit<int>(0), intit<int>(assign_size));
             test.assign(temp_cont.begin(), temp_cont.end());
 
+            //Expecting NO new allocations
             ASSERT_EQ(test.get_allocator().allocations(), 1);
             ASSERT_EQ(test.get_allocator().deallocations(), 1);
 
-            if constexpr (std::is_trivially_copyable_v<TestFixture::counted_int>) {
-                SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, 0, 0, assign_size, 0, 0);
-            }
-            else
-                SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, assign_size, 0, assign_size, 0, 0);
+            constexpr size_t expected_assigns = std::is_trivially_copyable_v<TestFixture::counted_int> ? 0 : assign_size;
+            SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, 0, 0, expected_assigns, 0, init_size - assign_size);
 
-            ASSERT_TRUE(std::equal(test.begin(), test.end(), temp_cont.begin(), temp_cont.end()));
-
-
+            ASSERT_TRUE(std::equal(temp_cont.begin(), temp_cont.end(), test.begin(), test.end()));
         }
+
+        ASSERT_EQ(TestFixture::counted_int::destructions_counts(), init_size);
     }
 }
