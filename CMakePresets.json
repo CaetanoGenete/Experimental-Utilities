@@ -1,0 +1,30 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 1
+  },
+  "configurePresets": [
+    {
+      "name": "VS17-x86",
+      "binaryDir": "${sourceDir}/build/bin-ints/MSVC/x86",
+      "description": "Build with Visual Studio 17 for x86 architecture",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x86",
+        "strategy": "set"
+      }
+    },
+    {
+      "name": "VS17-x64",
+      "binaryDir": "${sourceDir}/build/bin-ints/MSVC/x64",
+      "description": "Build with Visual Studio 17 for x64 architecture",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      }
+    }
+  ]
+}
