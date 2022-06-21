@@ -219,6 +219,8 @@ namespace smm_tests {
 
             test.assign(temp_cont.begin(), temp_cont.end());
 
+            ASSERT_EQ(test.capacity(), assign_size);
+
             ASSERT_EQ(test.get_allocator().allocations(), 2);
             ASSERT_EQ(test.get_allocator().deallocations(), 2);
             
@@ -250,6 +252,8 @@ namespace smm_tests {
             ASSERT_TRUE(TestFixture::populate_darray(test, intit<int>(0), intit<int>(init_size)));
 
             test.assign(temp_cont.begin(), temp_cont.end());
+
+            ASSERT_EQ(test.capacity(), assign_size * 2);
 
             //Expecting NO new allocations
             ASSERT_EQ(test.get_allocator().allocations(), 1);
@@ -283,6 +287,8 @@ namespace smm_tests {
             ASSERT_TRUE(TestFixture::populate_darray(test, intit<int>(0), intit<int>(init_size)));
 
             test.assign(temp_cont.begin(), temp_cont.end());
+
+            ASSERT_EQ(test.capacity(), init_size);
 
             //Expecting NO new allocations
             ASSERT_EQ(test.get_allocator().allocations(), 1);

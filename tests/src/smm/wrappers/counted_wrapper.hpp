@@ -170,11 +170,11 @@ namespace smm_tests {
 
         //Todo: Consider moving to static function
 #define SMM_TESTS_ASSERT_COUNTS(counted_type, copy_ctors_count, move_ctors_count, copy_asgns_count, move_asgns_count, destrs_count) \
-    ASSERT_EQ(counted_type##::copy_ctors_counts(), copy_ctors_count);                                                               \
-    ASSERT_EQ(counted_type##::move_ctors_counts(), move_ctors_count);                                                               \
-    ASSERT_EQ(counted_type##::copy_asgns_counts(), copy_asgns_count);                                                               \
-    ASSERT_EQ(counted_type##::move_asgns_counts(), move_asgns_count);                                                               \
-    ASSERT_EQ(counted_type##::destructions_counts(), destrs_count);                                                                 \
+    ASSERT_EQ(counted_type::copy_ctors_counts(), copy_ctors_count);                                                                 \
+    ASSERT_EQ(counted_type::move_ctors_counts(), move_ctors_count);                                                                 \
+    ASSERT_EQ(counted_type::copy_asgns_counts(), copy_asgns_count);                                                                 \
+    ASSERT_EQ(counted_type::move_asgns_counts(), move_asgns_count);                                                                 \
+    ASSERT_EQ(counted_type::destructions_counts(), destrs_count);                                                                   \
 
 }
 
