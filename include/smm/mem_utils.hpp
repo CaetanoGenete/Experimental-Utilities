@@ -11,7 +11,7 @@ namespace smm {
     struct one_then_variadic{};
 
     template<typename Type1, typename Type2, bool = std::is_empty_v<Type1>>
-    class compressed_pair 
+    class compressed_pair final
     {
     public:
         template<typename ... SecondArgs>
@@ -59,7 +59,7 @@ namespace smm {
     };
 
     template<typename Type1, typename Type2>
-    class compressed_pair<Type1, Type2, true> : public Type1 
+    class compressed_pair<Type1, Type2, true> final : public Type1 
     {
     private:
         using _base_t = Type1;
@@ -119,11 +119,11 @@ namespace smm {
 
     template<typename Alloc>
     constexpr void range_destroy_al(Alloc& alloc, _alloc_value_t<Alloc>* begin, _alloc_value_t<Alloc>* end) 
+        noexcept
     {
         if constexpr (!std::is_trivially_destructible_v<_alloc_value_t<Alloc>>) {
             for (; begin != end; ++begin)
                 std::allocator_traits<Alloc>::destroy(alloc, begin);
-
         }
     }
 

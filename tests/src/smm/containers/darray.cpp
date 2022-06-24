@@ -32,6 +32,7 @@ namespace smm_tests {
         constexpr static bool populate_darray(smm::darray<counted_int, counted_allocator<Alloc>>& arr, InIt begin, InIt end)
         {
             size_t init_size = arr.size();
+            size_t init_cap  = arr.capacity();
 
             size_t expected_moves    = counted_int::move_ctors_counts();
             size_t expected_destrs   = counted_int::destructions_counts();
@@ -56,6 +57,9 @@ namespace smm_tests {
                 size_t new_capacity = expected_capacity + expected_capacity / 2;
                 expected_capacity = std::max(expected_capacity + 1, new_capacity);
             }
+
+            if (init_cap == 0)
+                --expected_deallocs;
 
             if (grow_to           != arr.size())                          return false;
             if (expected_moves    != counted_int::move_ctors_counts())    return false;
@@ -193,7 +197,7 @@ namespace smm_tests {
 
             //Here expecting no new (de)allocations.
             ASSERT_EQ(moved.get_allocator().allocations(), 1);
-            ASSERT_EQ(moved.get_allocator().deallocations(), 1);
+            ASSERT_EQ(moved.get_allocator().deallocations(), 0);
         }
 
         ASSERT_EQ(TestFixture::counted_int::destructions_counts(), test_size);
@@ -222,7 +226,7 @@ namespace smm_tests {
             ASSERT_EQ(test.capacity(), assign_size);
 
             ASSERT_EQ(test.get_allocator().allocations(), 2);
-            ASSERT_EQ(test.get_allocator().deallocations(), 2);
+            ASSERT_EQ(test.get_allocator().deallocations(), 1);
             
             constexpr size_t expected_copies = std::is_trivially_copyable_v<TestFixture::counted_int> ? 0 : assign_size;
             SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, expected_copies, 0, 0, 0, init_size);
@@ -257,7 +261,7 @@ namespace smm_tests {
 
             //Expecting NO new allocations
             ASSERT_EQ(test.get_allocator().allocations(), 1);
-            ASSERT_EQ(test.get_allocator().deallocations(), 1);
+            ASSERT_EQ(test.get_allocator().deallocations(), 0);
 
             constexpr size_t expected_copies = std::is_trivially_copyable_v<TestFixture::counted_int> ? 0 : assign_size - init_size;
             SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, expected_copies, 0, init_size, 0, 0);
@@ -292,7 +296,7 @@ namespace smm_tests {
 
             //Expecting NO new allocations
             ASSERT_EQ(test.get_allocator().allocations(), 1);
-            ASSERT_EQ(test.get_allocator().deallocations(), 1);
+            ASSERT_EQ(test.get_allocator().deallocations(), 0);
 
             constexpr size_t expected_assigns = std::is_trivially_copyable_v<TestFixture::counted_int> ? 0 : assign_size;
             SMM_TESTS_ASSERT_COUNTS(TestFixture::counted_int, 0, 0, expected_assigns, 0, init_size - assign_size);

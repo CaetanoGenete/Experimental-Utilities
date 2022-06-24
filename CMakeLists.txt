@@ -57,8 +57,15 @@ set_target_properties(
 target_include_directories(${PROJECT_NAME} PUBLIC ${smm_header_rel_dir})
 
 #Match MSVC filters to file structure
-source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${smm_source_dirs} ${smm_pub_header_dirs})
+source_group(
+    TREE 
+    ${CMAKE_SOURCE_DIR} 
+    FILES 
+    ${smm_source_dirs} 
+    ${smm_pub_header_dirs})
 
 #TESTING
 enable_testing()
 add_subdirectory("tests")
+
+add_subdirectory("benchmarks")
