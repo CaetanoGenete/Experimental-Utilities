@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/googletest-populate"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/11bef657cc852e681323b3e00ee4ae00/googletest-populate.rule"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/e9924938b522b0405f4a7921eddce674/googletest-populate-complete.rule"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/245b0856960aa337fa3f9e0cce4598b6/googletest-populate-build.rule"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/245b0856960aa337fa3f9e0cce4598b6/googletest-populate-configure.rule"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/245b0856960aa337fa3f9e0cce4598b6/googletest-populate-download.rule"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/245b0856960aa337fa3f9e0cce4598b6/googletest-populate-install.rule"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/245b0856960aa337fa3f9e0cce4598b6/googletest-populate-mkdir.rule"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/245b0856960aa337fa3f9e0cce4598b6/googletest-populate-patch.rule"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/245b0856960aa337fa3f9e0cce4598b6/googletest-populate-test.rule"
+		},
+		{
+			"file" : "C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/CMakeFiles/245b0856960aa337fa3f9e0cce4598b6/googletest-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"googletest-populate"
+		],
+		"name" : "googletest-populate"
+	}
+}

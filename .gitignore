@@ -1,2 +1,8 @@
 .vs
+
+#Do not push intermediates and build results
 build
+
+#Avoid pushing non-essential images
+docs/**.png
+docs/**.jpg

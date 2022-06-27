@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED true)
 
 project(
-    smm
+    expu
     VERSION 0.0.1
     DESCRIPTION "Terrible implementantion of a few STL containers and functions"
     LANGUAGES CXX)
@@ -64,8 +64,12 @@ source_group(
     ${smm_source_dirs} 
     ${smm_pub_header_dirs})
 
-#TESTING
+#Ensures dependencies are installed to the 'deps' directory.
+set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/deps")
+
+#Testing
 enable_testing()
 add_subdirectory("tests")
 
+#Benchmarks are compiled as part of the project
 add_subdirectory("benchmarks")

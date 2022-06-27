@@ -1,0 +1,10 @@
+^C:\USERS\CAETA\DOCUMENTS\PROGRAMMING\PROJECTS\C++\WORKING\EXPERIMENTAL-UTILITIES\DEPS\GOOGLETEST-SUBBUILD\CMAKEFILES\11BEF657CC852E681323B3E00EE4AE00\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild -BC:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/caeta/Documents/Programming/Projects/C++/Working/Experimental-Utilities/deps/googletest-subbuild/googletest-populate.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

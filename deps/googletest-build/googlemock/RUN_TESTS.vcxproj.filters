@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\caeta\Documents\Programming\Projects\C++\Working\Experimental-Utilities\build\bin-ints\MSVC\x64\CMakeFiles\a500080d56f0225e1e68162266f8eeeb\RUN_TESTS_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{A05A94FB-03D2-311B-A70B-BB538085827D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
