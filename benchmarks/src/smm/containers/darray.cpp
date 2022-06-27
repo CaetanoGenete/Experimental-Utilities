@@ -4,37 +4,23 @@
 
 #include "smm/containers/darray.hpp"
 
+template<class Container>
+static void BM_push_back(benchmark::State& state) {
+    const size_t push_back_count = 1 << state.range(0);
 
-//static void bm_darray_push_back(benchmark::State& state) {
-//    const size_t push_back_count = state.range(0);
-//
-//    for (auto _ : state) {
-//        smm::darray<size_t> arr;
-//
-//        for (size_t i = 0; i < push_back_count; ++i)
-//            arr.push_back(i);
-//    }
-//}
-//
-//static void bm_vector_push_back(benchmark::State& state) {
-//    const size_t push_back_count = state.range(0);
-//
-//    for (auto _ : state) {
-//        std::vector<size_t> arr;
-//
-//        for (size_t i = 0; i < push_back_count; ++i)
-//            arr.push_back(i);
-//    }
-//}
-//
-//BENCHMARK(bm_darray_push_back)->Range(8, 1 << 24);
-//BENCHMARK(bm_vector_push_back)->Range(8, 1 << 24);
+    for (auto _ : state) {
+        Container arr;
 
-static void bm_darray_default_construct(benchmark::State& state) {
-    for (auto _ : state)
-        benchmark::DoNotOptimize(smm::darray<size_t>());
+        for (size_t i = 0; i < push_back_count; ++i)
+            arr.push_back(i);
+    }
+
+    const size_t bytes = push_back_count * sizeof(size_t);
+    state.SetBytesProcessed(bytes);
+    state.SetLabel(std::to_string(bytes >> 10));
 }
 
-BENCHMARK(bm_darray_default_construct);
+//BENCHMARK(BM_push_back<std::vector<int>>)->DenseRange(8, 23);
+BENCHMARK(BM_push_back<smm::darray<int>>)->DenseRange(8, 23);
 
 BENCHMARK_MAIN();

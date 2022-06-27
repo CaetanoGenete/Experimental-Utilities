@@ -12,6 +12,8 @@
 #include "wrappers/counted_wrapper.hpp"
 #include "wrappers/counted_allocator.hpp"
 
+#include <vector>
+
 namespace smm_tests {
 
     struct inherit_trivial: public std::true_type {};
@@ -107,6 +109,26 @@ namespace smm_tests {
 
     using darray_grow_tests_types = testing::Types<dont_inherit_trivial, inherit_trivial>;
     TYPED_TEST_SUITE(darray_tests, darray_grow_tests_types);
+
+    TEST(darray_misc_tests, traits_test) {
+        using type = smm::darray<int>;
+
+        ASSERT_EQ(sizeof(type), 24);
+    }
+
+    TEST(darray_misc_tests, misc) {
+        smm::darray<int> arr1;
+        std::vector<int> arr2;
+
+        ASSERT_EQ(arr1.capacity(), arr2.capacity());
+
+        for (int i = 0; i < (1 << 13); ++i) {
+            arr1.push_back(i);
+            arr2.push_back(i);
+
+            ASSERT_EQ(arr1.capacity(), arr2.capacity());
+        }
+    }
 
     TYPED_TEST(darray_tests, u_emplace_back_nogrow)
     {

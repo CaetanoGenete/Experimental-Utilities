@@ -155,8 +155,10 @@ namespace smm {
             ++_last;
         }
 
-        constexpr pointer release() noexcept {
-            return (_first = _last);
+        constexpr pointer release() noexcept 
+        {
+            _first = _last;
+            return _first;
         }
     };
 

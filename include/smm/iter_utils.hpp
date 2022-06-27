@@ -43,6 +43,7 @@ namespace smm {
 
     template<std::contiguous_iterator InputCtgIt, std::contiguous_iterator OutputCtgIt>
     OutputCtgIt _range_memcpy(std::move_iterator<InputCtgIt> begin, std::move_iterator<InputCtgIt> end, OutputCtgIt output)
+        noexcept
     {
         return _range_memcpy(begin.base(), end.base(), output);
     }
@@ -87,6 +88,7 @@ namespace smm {
         return partial_range.release();
     }
 
+    /*
     template<std::input_iterator InputIt, typename Alloc>
     constexpr auto uninitialised_move(Alloc& alloc, InputIt begin, InputIt end, _alloc_value_t<Alloc>* output) 
         noexcept(std::is_nothrow_move_constructible_v<std::iter_value_t<InputIt>>)
@@ -97,6 +99,23 @@ namespace smm {
             std::make_move_iterator(begin), 
             std::make_move_iterator(end), 
             output);
+    }
+    */
+
+    template<std::input_iterator InputIt, typename Alloc>
+    constexpr auto uninitialised_move(Alloc& alloc, InputIt begin, InputIt end, _alloc_value_t<Alloc>* output)
+        noexcept(std::is_nothrow_constructible_v<_alloc_value_t<Alloc>, std::iter_reference_t<InputIt>>)
+    {
+        if constexpr (_is_memcpyable_to_v<InputIt, _alloc_value_t<Alloc>*>) {
+            if (!std::is_constant_evaluated())
+                return _range_memcpy(begin, end, output);
+        }
+
+        _partial_range_al<Alloc> partial_range(alloc, output);
+        for (; begin != end; ++begin)
+            partial_range.emplace_back(std::move(*begin));
+
+        return partial_range.release();
     }
 
     template<std::input_iterator InputIt, std::input_iterator OutIt>
