@@ -6,48 +6,61 @@ project(
     DESCRIPTION "Terrible implementantion of a few STL containers and functions"
     LANGUAGES CXX)
 
-#Project directories 
-set(smm_header_rel_dir "${CMAKE_SOURCE_DIR}/include/")
-set(smm_source_rel_dir  "${CMAKE_SOURCE_DIR}/src/")
+#Ensures targets are nicely organised into folder in choice IDE. 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-#Relative path of public headers (From ${headers_rel_dir})
-set(smm_pub_header_dirs 
+set(EXPU_INCLUDE_DIR             "${CMAKE_SOURCE_DIR}/include/")
+set(CMAKE_MODULE_PATH            "${CMAKE_SOURCE_DIR}/cmake/")
+set(EXPU_DEPENDENCIES_BINARY_DIR "${CMAKE_BINARY_DIR}/dependencies/")
+set(EXPU_DEPENDENCIES_SOURCE_DIR "${CMAKE_SOURCE_DIR}/deps/")
+
+#Relative path to headers from ${CMAKE_SOURCE_DIR}
+set(EXPU_HEADERS 
     "include/expu/debug.hpp"
-    "include/expu/defines.hpp"
-    "include/expu/traits_ext.hpp"
     "include/expu/mem_utils.hpp"
-    "include/expu/iter_utils.hpp"
-    "include/expu/int_seq.hpp"
+    "include/expu/meta/int_seq.hpp"
+    "include/expu/meta/meta_utils.hpp"
     "include/expu/containers/darray.hpp"
-    "include/expu/containers/llist.hpp"
-    "include/expu/containers/graph.hpp"
-    "include/expu/containers/hashmap.hpp"
-    "include/expu/iterators/sorting.hpp"
-)
+    "include/expu/containers/fuple.hpp"
+    "include/expu/iterators/iter_utils.hpp"
+    "include/expu/iterators/sorting.hpp")
 
-add_library(${PROJECT_NAME} STATIC ${smm_source_dirs} ${smm_pub_header_dirs})
+add_library(expu INTERFACE)
+target_include_directories(expu INTERFACE ${EXPU_INCLUDE_DIR})
+target_compile_features(expu INTERFACE cxx_std_20)
 
-if(MSVC)
-    #Required for __VA_OPT__ support
-    target_compile_options(${PROJECT_NAME} PUBLIC /Zc:preprocessor)
+if(MSVC) #Required for __VA_OPTS__ support
+    target_compile_options(expu INTERFACE /Zc:preprocessor)
 endif()
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${smm_header_rel_dir})
+###Additional options###
 
-#Match MSVC filters to file structure
-source_group(
-    TREE 
-    ${CMAKE_SOURCE_DIR} 
-    FILES 
-    ${smm_source_dirs} 
-    ${smm_pub_header_dirs})
+option(EXPU_CREATE_TARGET "Creates a mock target, used to view headers in IDE's")
+if(EXPU_CREATE_TARGET)
+    file(WRITE "${CMAKE_BINARY_DIR}/dummy.cpp" "// dummy.cpp exists solely to make cmake happy.")
 
-#Ensures dependencies are installed to the 'deps' directory.
-set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/deps")
+    #Create dummy target to appear in IDE
+    add_library(expu_headers MODULE EXCLUDE_FROM_ALL)
+    target_sources(expu_headers PRIVATE ${EXPU_HEADERS} "${CMAKE_BINARY_DIR}/dummy.cpp")
+    target_link_libraries(expu_headers expu)
 
-#Testing
-enable_testing()
-add_subdirectory("tests")
+    #Match IDE source tree with directory tree. 
+    source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${EXPU_HEADERS})
+endif()
 
-#Benchmarks are compiled as part of the project
-add_subdirectory("benchmarks")
+option(EXPU_BUILD_TESTS "Builds and runs tests.")
+if(EXPU_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+option(EXPU_BUILD_BENCHMARKS "Builds benchmarks.")
+if(EXPU_BUILD_BENCHMARKS)
+
+endif()
+
+
+
+
+
+

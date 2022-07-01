@@ -3,8 +3,6 @@
 
 #include <iostream>
 
-#include "defines.hpp"
-
 #ifndef SMM_DEBUG_LEVEL
 #define SMM_DEBUG_LEVEL 0
 #endif // !CESS_DEBUG_LEVEL

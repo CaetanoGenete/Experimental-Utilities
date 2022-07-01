@@ -3,8 +3,6 @@
 
 #include <type_traits>
 
-#include "expu/defines.hpp"
-
 namespace expu {
 
     template<typename Type, template<typename ...> typename Base>
