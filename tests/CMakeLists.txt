@@ -8,7 +8,7 @@ FetchContent_Declare(
     GIT_TAG        release-1.12.1
     SOURCE_DIR     "${EXPU_DEPENDENCIES_SOURCE_DIR}/googletest/"
     BINARY_DIR     "${EXPU_DEPENDENCIES_BINARY_DIR}/googletest/build/"
-    BINARY_SUBDIR  "${EXPU_DEPENDENCIES_BINARY_DIR}/googletest/sub-build/")
+    SUBBUILD_DIR   "${EXPU_DEPENDENCIES_BINARY_DIR}/googletest/sub-build/")
 
 FetchContent_MakeAvailable(googletest)
 
