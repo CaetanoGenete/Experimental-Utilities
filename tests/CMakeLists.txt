@@ -17,4 +17,5 @@ set_target_properties(gtest_main PROPERTIES FOLDER extern)
 set_target_properties(gmock      PROPERTIES FOLDER extern)
 set_target_properties(gmock_main PROPERTIES FOLDER extern)
 
-add_gtest(darray "darray.cpp" expu)
+add_gtest(darray "darray.cpp;counters.hpp" expu)
+add_gtest(static_map "linear_map.cpp" expu)

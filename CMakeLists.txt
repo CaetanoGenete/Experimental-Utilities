@@ -6,7 +6,7 @@ project(
     DESCRIPTION "Terrible implementantion of a few STL containers and functions"
     LANGUAGES CXX)
 
-#Ensures targets are nicely organised into folder in choice IDE. 
+#Ensures targets are nicely organised into folder in choice IDE.
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 set(EXPU_INCLUDE_DIR             "${CMAKE_SOURCE_DIR}/include/")
@@ -15,15 +15,19 @@ set(EXPU_DEPENDENCIES_BINARY_DIR "${CMAKE_BINARY_DIR}/dependencies/")
 set(EXPU_DEPENDENCIES_SOURCE_DIR "${CMAKE_SOURCE_DIR}/deps/")
 
 #Relative path to headers from ${CMAKE_SOURCE_DIR}
-set(EXPU_HEADERS 
+set(EXPU_HEADERS
     "include/expu/debug.hpp"
     "include/expu/mem_utils.hpp"
+    "include/expu/test_utils.hpp"
     "include/expu/meta/int_seq.hpp"
     "include/expu/meta/meta_utils.hpp"
+    "include/expu/meta/function_traits.hpp"
     "include/expu/containers/darray.hpp"
-    "include/expu/containers/fuple.hpp"
+    "include/expu/containers/linear_map.hpp"
     "include/expu/iterators/iter_utils.hpp"
-    "include/expu/iterators/sorting.hpp")
+    "include/expu/iterators/sorting.hpp"
+    "include/expu/iterators/searching.hpp"
+    "include/expu/iterators/seq_iter.hpp")
 
 add_library(expu INTERFACE)
 target_include_directories(expu INTERFACE ${EXPU_INCLUDE_DIR})
@@ -56,7 +60,7 @@ endif()
 
 option(EXPU_BUILD_BENCHMARKS "Builds benchmarks.")
 if(EXPU_BUILD_BENCHMARKS)
-
+    
 endif()
 
 

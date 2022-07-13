@@ -7,8 +7,8 @@
 #define SMM_DEBUG_LEVEL 0
 #endif // !CESS_DEBUG_LEVEL
 
-#ifndef SMM_ITERATOR_DEBUG_LEVEL
-#define SMM_ITERATOR_DEBUG_LEVEL SMM_DEBUG_LEVEL
+#ifndef EXPU_ITERATOR_DEBUG_LEVEL
+#define EXPU_ITERATOR_DEBUG_LEVEL SMM_DEBUG_LEVEL
 #endif // !SMM_ITERATOR_DEBUG_LEVEL
 
 #define SMM_VERIFY(condition, message)                                              \

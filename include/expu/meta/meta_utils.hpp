@@ -2,6 +2,7 @@
 #define SMM_TRAITS_EXT_HPP_INCLUDED
 
 #include <type_traits>
+#include <string_view>
 
 namespace expu {
 
@@ -17,6 +18,29 @@ namespace expu {
     template<typename Type, template<typename ...> typename Base>
     concept template_of = is_template_of_v<Type, Base>;
 
+
+    template<typename Type>
+    constexpr std::string type_name()
+    {
+        std::string prefix = "";
+
+        if constexpr (std::is_const_v<std::remove_reference_t<Type>>)
+            prefix += "const ";
+
+        if constexpr (std::is_volatile_v<std::remove_reference_t<Type>>)
+            prefix += "volatile ";
+
+        constexpr auto postfix = std::is_rvalue_reference_v<Type> ? "&&" :
+            std::is_lvalue_reference_v<Type> ? "&" : "";
+
+        return prefix + typeid(Type).name() + postfix;
+    }
+
+    template<typename Type>
+    constexpr std::string type_name(Type&& type)
+    {
+        return type_name<decltype(type)>();
+    }
 }
 
 #endif // SMM_TRAITS_EXT_HPP_INCLUDED
