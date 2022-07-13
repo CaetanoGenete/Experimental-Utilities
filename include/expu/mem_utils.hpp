@@ -3,8 +3,6 @@
 
 #include <type_traits>
 
-#include "defines.hpp"
-
 namespace expu {
 
     struct zero_then_variadic{};

@@ -1,75 +1,70 @@
 cmake_minimum_required(VERSION 3.22)
 
-#C++20 project with no extensions
-set(CMAKE_CXX_EXTENSIONS off)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED true)
-
 project(
-    expu
+    Experimental-Utilities
     VERSION 0.0.1
     DESCRIPTION "Terrible implementantion of a few STL containers and functions"
     LANGUAGES CXX)
 
-#Project directories 
-set(smm_header_rel_dir "${CMAKE_SOURCE_DIR}/include/")
-set(smm_source_rel_dir  "${CMAKE_SOURCE_DIR}/src/")
+#Ensures targets are nicely organised into folder in choice IDE.
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-#Relative path of public headers (From ${headers_rel_dir})
-set(smm_pub_header_dirs 
-    "${PROJECT_NAME}/debug.hpp"
-    "${PROJECT_NAME}/defines.hpp"
-    "${PROJECT_NAME}/traits_ext.hpp"
-    "${PROJECT_NAME}/mem_utils.hpp"
-    "${PROJECT_NAME}/iter_utils.hpp"
-    "${PROJECT_NAME}/int_seq.hpp"
+set(EXPU_INCLUDE_DIR             "${CMAKE_SOURCE_DIR}/include/")
+set(CMAKE_MODULE_PATH            "${CMAKE_SOURCE_DIR}/cmake/")
+set(EXPU_DEPENDENCIES_BINARY_DIR "${CMAKE_BINARY_DIR}/dependencies/")
+set(EXPU_DEPENDENCIES_SOURCE_DIR "${CMAKE_SOURCE_DIR}/deps/")
 
-    "${PROJECT_NAME}/containers/darray.hpp"
-    "${PROJECT_NAME}/containers/llist.hpp"
-    "${PROJECT_NAME}/containers/graph.hpp"
-    "${PROJECT_NAME}/containers/hashmap.hpp"
+#Relative path to headers from ${CMAKE_SOURCE_DIR}
+set(EXPU_HEADERS
+    "include/expu/debug.hpp"
+    "include/expu/mem_utils.hpp"
+    "include/expu/test_utils.hpp"
+    "include/expu/meta/int_seq.hpp"
+    "include/expu/meta/meta_utils.hpp"
+    "include/expu/meta/function_traits.hpp"
+    "include/expu/containers/darray.hpp"
+    "include/expu/containers/linear_map.hpp"
+    "include/expu/iterators/iter_utils.hpp"
+    "include/expu/iterators/sorting.hpp"
+    "include/expu/iterators/searching.hpp"
+    "include/expu/iterators/seq_iter.hpp")
 
-    "${PROJECT_NAME}/iterators/sorting.hpp"
-)
+add_library(expu INTERFACE)
+target_include_directories(expu INTERFACE ${EXPU_INCLUDE_DIR})
+target_compile_features(expu INTERFACE cxx_std_20)
 
-#Relative path of source files (From ${headers_rel_dir})
-set(smm_source_dirs 
-    "${PROJECT_NAME}/place_holder.cpp")
-
-#Convert relative paths to absolute 
-list(TRANSFORM smm_pub_header_dirs PREPEND "${smm_header_rel_dir}")
-list(TRANSFORM smm_source_dirs     PREPEND "${smm_source_rel_dir}")
-
-add_library(${PROJECT_NAME} STATIC ${smm_source_dirs} ${smm_pub_header_dirs})
-
-if(MSVC)
-    #Required for __VA_OPT__ support
-    target_compile_options(${PROJECT_NAME} PUBLIC /Zc:preprocessor)
+if(MSVC) #Required for __VA_OPTS__ support
+    target_compile_options(expu INTERFACE /Zc:preprocessor)
 endif()
 
-set_target_properties(
-    ${PROJECT_NAME} 
-    PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY   "${CMAKE_SOURCE_DIR}/build/bin/${CMAKE_GENERATOR}"
-    OUTPUT_NAME_DEBUG          "${PROJECT_NAME}d"
-    OUTPUT_NAME_RELWITHDEBINFO "${PROJECT_NAME}rd")
+###Additional options###
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${smm_header_rel_dir})
+option(EXPU_CREATE_TARGET "Creates a mock target, used to view headers in IDE's")
+if(EXPU_CREATE_TARGET)
+    file(WRITE "${CMAKE_BINARY_DIR}/dummy.cpp" "// dummy.cpp exists solely to make cmake happy.")
 
-#Match MSVC filters to file structure
-source_group(
-    TREE 
-    ${CMAKE_SOURCE_DIR} 
-    FILES 
-    ${smm_source_dirs} 
-    ${smm_pub_header_dirs})
+    #Create dummy target to appear in IDE
+    add_library(expu_headers MODULE EXCLUDE_FROM_ALL)
+    target_sources(expu_headers PRIVATE ${EXPU_HEADERS} "${CMAKE_BINARY_DIR}/dummy.cpp")
+    target_link_libraries(expu_headers expu)
 
-#Ensures dependencies are installed to the 'deps' directory.
-set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/deps")
+    #Match IDE source tree with directory tree. 
+    source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${EXPU_HEADERS})
+endif()
 
-#Testing
-enable_testing()
-add_subdirectory("tests")
+option(EXPU_BUILD_TESTS "Builds and runs tests.")
+if(EXPU_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
-#Benchmarks are compiled as part of the project
-add_subdirectory("benchmarks")
+option(EXPU_BUILD_BENCHMARKS "Builds benchmarks.")
+if(EXPU_BUILD_BENCHMARKS)
+    
+endif()
+
+
+
+
+
+
