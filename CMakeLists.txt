@@ -19,7 +19,6 @@ set(EXPU_HEADERS
     "include/expu/debug.hpp"
     "include/expu/mem_utils.hpp"
     "include/expu/test_utils.hpp"
-    "include/expu/meta/int_seq.hpp"
     "include/expu/meta/meta_utils.hpp"
     "include/expu/meta/function_traits.hpp"
     "include/expu/containers/darray.hpp"

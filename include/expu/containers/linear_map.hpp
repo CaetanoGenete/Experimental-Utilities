@@ -35,14 +35,26 @@ namespace expu {
 
     public: //Constructors
         template<typename ... Args>
+        requires std::is_constructible_v<Container, Args...>
         constexpr linear_map(Args&& ... args) 
             noexcept(std::is_nothrow_constructible_v<Container, Args...>):
             _elements(std::forward<Args>(args)...) {}
 
-    private:
-        [[nodiscard]] constexpr const_iterator _find_key(const key_type& key) const 
+        constexpr linear_map(const std::initializer_list<value_type>& init_list):
+            _elements(init_list) {}
+
+    public:
+        [[nodiscard]] constexpr const_iterator find(const key_type& key) const 
         {
             return find_if(cbegin(), cend(), [&](const value_type& curr) {
+                return key_equal{}(curr.first, key);
+            });
+        }
+
+        //Todo: Find way to avoid code duplication above!
+        [[nodiscard]] constexpr iterator find(const key_type& key)
+        {
+            return find_if(begin(), end(), [&](const value_type& curr) {
                 return key_equal{}(curr.first, key);
             });
         }
@@ -50,7 +62,7 @@ namespace expu {
     public: // Indexing functions
         [[nodiscard]] constexpr const mapped_type& at(const key_type& key) const
         {
-            const_iterator loc = _find_key(key);
+            const_iterator loc = find(key);
 
             if (loc == cend())
                 throw std::out_of_range("Key not found!");
@@ -65,18 +77,18 @@ namespace expu {
 
         [[nodiscard]] constexpr const mapped_type& operator[](const key_type& key) const
         {
-            const_iterator loc = _find_key(key);
+            const_iterator loc = find(key);
 
             return (*loc).second;
         }
 
         constexpr mapped_type& operator[](const key_type& key)
         {
-            const_iterator loc = _find_key(key);
+            const_iterator loc = find(key);
 
             if (loc == cend())
                 //Note: The standard does not require that a SequentialContainer's
-                //emplace_back returns anything, unlike _emplace 
+                //emplace_back returns anything, unlike emplace 
                 return (*_elements.emplace(cend(), key, mapped_type())).second;
             else
                 //Note: Safe to do since container is non-const

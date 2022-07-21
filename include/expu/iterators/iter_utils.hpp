@@ -27,9 +27,9 @@ namespace expu {
     template<std::contiguous_iterator InputCtgIt, std::contiguous_iterator OutCtgIt>
     OutCtgIt _range_memcpy(InputCtgIt begin, InputCtgIt end, OutCtgIt output)
     {
-        const char* begin_chr  = reinterpret_cast<const char*>(std::to_address(begin));
-        const char* end_chr    = reinterpret_cast<const char*>(std::to_address(end));
-        char* output_chr       = reinterpret_cast<char*>(std::to_address(output));
+        const char* begin_chr = reinterpret_cast<const char*>(std::to_address(begin));
+        const char* end_chr   = reinterpret_cast<const char*>(std::to_address(end));
+        char* output_chr      = reinterpret_cast<char*>(std::to_address(output));
 
         size_t size = static_cast<size_t>(end_chr - begin_chr);
         std::memcpy(output_chr, begin_chr, size);
@@ -43,9 +43,34 @@ namespace expu {
 
     template<std::contiguous_iterator InputCtgIt, std::contiguous_iterator OutputCtgIt>
     OutputCtgIt _range_memcpy(std::move_iterator<InputCtgIt> begin, std::move_iterator<InputCtgIt> end, OutputCtgIt output)
-        noexcept
     {
         return _range_memcpy(begin.base(), end.base(), output);
+    }
+
+    //Todo: Consider supporting volatility
+    template<std::contiguous_iterator InputCtgIt, std::contiguous_iterator OutCtgIt>
+    OutCtgIt _range_backward_memcpy(InputCtgIt begin, InputCtgIt end, OutCtgIt output)
+    {
+        const char* begin_chr = reinterpret_cast<const char*>(std::to_address(begin));
+        const char* end_chr   = reinterpret_cast<const char*>(std::to_address(end));
+        char* output_chr      = reinterpret_cast<char*>(std::to_address(output));
+
+        size_t size = static_cast<size_t>(end_chr - begin_chr);
+        output_chr -= size;
+
+        std::memcpy(output_chr, begin_chr, size);
+
+        //Save like 1 instruction LOL!
+        if constexpr (std::is_pointer_v<OutCtgIt>)
+            return reinterpret_cast<OutCtgIt>(output_chr);
+        else
+            return output - (end - begin);
+    }
+
+    template<std::contiguous_iterator InputCtgIt, std::contiguous_iterator OutputCtgIt>
+    OutputCtgIt _range_backward_memcpy(std::move_iterator<InputCtgIt> begin, std::move_iterator<InputCtgIt> end, OutputCtgIt output)
+    {
+        return _range_backward_memcpy(begin.base(), end.base(), output);
     }
 
     //Todo: Consider supporting volatility
@@ -53,8 +78,8 @@ namespace expu {
     OutCtgIt _range_memmove(InputCtgIt begin, InputCtgIt end, OutCtgIt output)
     {
         const char* begin_chr = reinterpret_cast<const char*>(std::to_address(begin));
-        const char* end_chr = reinterpret_cast<const char*>(std::to_address(end));
-        char* output_chr = reinterpret_cast<char*>(std::to_address(output));
+        const char* end_chr   = reinterpret_cast<const char*>(std::to_address(end));
+        char* output_chr      = reinterpret_cast<char*>(std::to_address(output));
 
         size_t size = static_cast<size_t>(end_chr - begin_chr);
         std::memmove(output_chr, begin_chr, size);
@@ -88,7 +113,22 @@ namespace expu {
         return partial_range.release();
     }
 
-    /*
+    template<std::bidirectional_iterator BiDirIt, typename Alloc>
+    constexpr auto uninitialised_backward_copy(Alloc& alloc, BiDirIt begin, BiDirIt end, _alloc_value_t<Alloc>* output)
+        noexcept(std::is_nothrow_constructible_v<_alloc_value_t<Alloc>, std::iter_reference_t<BiDirIt>>)
+    {
+        if constexpr (_is_memcpyable_to_v<BiDirIt, _alloc_value_t<Alloc>*>) {
+            if (!std::is_constant_evaluated())
+                return _range_backward_memcpy(begin, end, output);
+        }
+
+        _partial_backward_range_al<Alloc> partial_range(alloc, output);
+        while(begin != end)
+            partial_range.emplace_back(*(--end));
+
+        return partial_range.release();
+    }
+
     template<std::input_iterator InputIt, typename Alloc>
     constexpr auto uninitialised_move(Alloc& alloc, InputIt begin, InputIt end, _alloc_value_t<Alloc>* output) 
         noexcept(std::is_nothrow_move_constructible_v<std::iter_value_t<InputIt>>)
@@ -100,8 +140,20 @@ namespace expu {
             std::make_move_iterator(end), 
             output);
     }
-    */
 
+    template<std::bidirectional_iterator BiDirIt, typename Alloc>
+    constexpr auto uninitialised_backward_move(Alloc& alloc, BiDirIt begin, BiDirIt end, _alloc_value_t<Alloc>* output)
+        noexcept(std::is_nothrow_move_constructible_v<std::iter_value_t<BiDirIt>>)
+    {
+        //Todo: Check performance penalty
+        return uninitialised_backward_copy(
+            alloc,
+            std::make_move_iterator(begin),
+            std::make_move_iterator(end),
+            output);
+    }
+
+    /*
     template<std::input_iterator InputIt, typename Alloc>
     constexpr auto uninitialised_move(Alloc& alloc, InputIt begin, InputIt end, _alloc_value_t<Alloc>* output)
         noexcept(std::is_nothrow_constructible_v<_alloc_value_t<Alloc>, std::iter_reference_t<InputIt>>)
@@ -117,6 +169,7 @@ namespace expu {
 
         return partial_range.release();
     }
+    */
 
     template<std::input_iterator InputIt, std::input_iterator OutIt>
     constexpr OutIt copy(InputIt begin, InputIt end, OutIt output) {
@@ -129,6 +182,35 @@ namespace expu {
             *output = *begin;
 
         return output;
+    }
+
+    template<std::input_iterator InputIt, std::input_iterator OutIt>
+    constexpr OutIt move(InputIt begin, InputIt end, OutIt output) {
+        return copy(
+            std::make_move_iterator(begin), 
+            std::make_move_iterator(end), 
+            output);
+    }
+
+    template<std::bidirectional_iterator BiDirIt, std::input_iterator OutIt>
+    constexpr OutIt backward_copy(BiDirIt begin, BiDirIt end, OutIt output) {
+        if constexpr (_is_memcpyable_to_v<BiDirIt, OutIt>) {
+            if (!std::is_constant_evaluated())
+                return _range_backward_memmove(begin, end, output);
+        }
+
+        while(begin != end)
+            *(--output) = *(--begin);
+
+        return output;
+    }
+
+    template<std::bidirectional_iterator BiDirIt, std::input_iterator OutIt>
+    constexpr OutIt move(BiDirIt begin, BiDirIt end, OutIt output) {
+        return backward_copy(
+            std::make_move_iterator(begin),
+            std::make_move_iterator(end),
+            output);
     }
 
     //IMPORTANT: High risk of memory leak! Returned pointer must be deallocated!

@@ -18,7 +18,6 @@ namespace expu {
         using difference_type   = DiffType;
 
     public:
-
         constexpr seq_iter() noexcept : _curr() {}
 
         constexpr seq_iter(IntType value)
@@ -118,22 +117,22 @@ namespace expu {
         lhs.swap(rhs);
     }
 
-    template<class IntType, class DiffType>
-    constexpr seq_iter<IntType, DiffType> operator+(seq_iter<IntType, DiffType> lhs, DiffType n) noexcept
+    template<class IntType, class DiffType, std::convertible_to<DiffType> Convertible>
+    constexpr seq_iter<IntType, DiffType> operator+(seq_iter<IntType, DiffType> lhs, Convertible n) noexcept
     {
         lhs += n;
         return lhs;
     }
 
-    template<class IntType, class DiffType>
-    constexpr seq_iter<IntType, DiffType> operator+(DiffType n, seq_iter<IntType, DiffType> rhs) noexcept
+    template<class IntType, class DiffType, std::convertible_to<DiffType> Convertible>
+    constexpr seq_iter<IntType, DiffType> operator+(Convertible n, seq_iter<IntType, DiffType> rhs) noexcept
     {
         rhs += n;
         return rhs;
     }
 
-    template<class IntType, class DiffType>
-    constexpr seq_iter<IntType, DiffType> operator-(seq_iter<IntType, DiffType> lhs, DiffType n) noexcept
+    template<class IntType, class DiffType, std::convertible_to<DiffType> Convertible>
+    constexpr seq_iter<IntType, DiffType> operator-(seq_iter<IntType, DiffType> lhs, Convertible n) noexcept
     {
         lhs -= n;
         return lhs;

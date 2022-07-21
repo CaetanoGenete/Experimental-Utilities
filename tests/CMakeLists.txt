@@ -18,4 +18,6 @@ set_target_properties(gmock      PROPERTIES FOLDER extern)
 set_target_properties(gmock_main PROPERTIES FOLDER extern)
 
 add_gtest(darray "darray.cpp;counters.hpp" expu)
+target_compile_definitions(darray PRIVATE EXPU_ALLOW_TRIVIAL_TEST_TYPE)
 add_gtest(static_map "linear_map.cpp" expu)
+target_compile_definitions(static_map PRIVATE EXPU_ALLOW_TRIVIAL_TEST_TYPE)

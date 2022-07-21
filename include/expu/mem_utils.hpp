@@ -160,6 +160,40 @@ namespace expu {
         }
     };
 
+    template<typename Alloc>
+    struct _partial_backward_range_al
+    {
+    public:
+        using pointer = _alloc_value_t<Alloc>*;
+
+    private:
+        pointer _first, _last;
+        Alloc& _alloc;
+
+    public:
+        constexpr _partial_backward_range_al(Alloc& _alloc, pointer last) noexcept :
+            _first(last), _last(last), _alloc(_alloc) {}
+
+        constexpr ~_partial_backward_range_al() noexcept
+        {
+            range_destroy_al(_alloc, _first, _last);
+        }
+
+    public:
+        template<typename ... Args>
+        constexpr void emplace_back(Args&& ... args)
+            noexcept(std::is_nothrow_constructible_v<Args...>)
+        {
+            std::allocator_traits<Alloc>::construct(_alloc, --_first, std::forward<Args>(args)...);
+        }
+
+        constexpr pointer release() noexcept
+        {
+            _last = _first;
+            return _first;
+        }
+    };
+
 }
 
 #endif // !SMM_MEM_UTILS_HPP_INCLUDED

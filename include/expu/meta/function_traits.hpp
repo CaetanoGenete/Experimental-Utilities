@@ -16,10 +16,13 @@ namespace expu {
         _all_special_ctor_deleted_type& operator=(_all_special_ctor_deleted_type&&) = delete;
     };
 
+    template<typename Type, typename ... Args>
+    constexpr bool calls_special_ctor_v = false;
+
     template<typename Type, typename Arg>
     requires (!std::is_final_v<Type>)
-    constexpr bool calls_special_ctor_v = !std::is_constructible_v<_all_special_ctor_deleted_type<Type>, Arg> &&
-                                           std::is_convertible_v<Arg, Type>;
+    constexpr bool calls_special_ctor_v<Type, Arg> = !std::is_constructible_v<_all_special_ctor_deleted_type<Type>, Arg> &&
+                                                      std::is_convertible_v<Arg, Type>;
 
     template<typename Type> constexpr bool calls_special_ctor_v<Type, Type> = true;
     template<typename Type> constexpr bool calls_special_ctor_v<Type, Type&> = true;

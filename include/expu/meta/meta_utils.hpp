@@ -41,6 +41,8 @@ namespace expu {
     {
         return type_name<decltype(type)>();
     }
+
+
 }
 
 #endif // SMM_TRAITS_EXT_HPP_INCLUDED
