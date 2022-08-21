@@ -2,72 +2,58 @@
 #define EXPU_STATIC_MAP_HPP_INCLUDED
 
 #include <utility> 
-#include <array> 
 #include <vector>
 
 #include "expu/containers/darray.hpp"
-#include "expu/iterators/searching.hpp"
 
 namespace expu {
 
     template<
-        typename KeyType,
-        typename MappedType,
-        typename Container = std::vector<std::pair<KeyType, MappedType>>,
-        typename KeyEqual  = std::equal_to<KeyType>> 
+        class KeyType,
+        class MappedType,
+        class Container = std::vector<std::pair<KeyType, MappedType>>,
+        class KeyEqual  = std::equal_to<KeyType>> 
     class linear_map {
     public: //Typedefs
-        using key_type               = KeyType;
-        using mapped_type            = MappedType;
-        using key_equal              = KeyEqual;
-        using value_type             = typename Container::value_type;
-        using size_type              = typename Container::size_type;
-        using different_type         = typename Container::difference_type;
-        using iterator               = typename Container::iterator;
-        using const_iterator         = typename Container::const_iterator;
-
-        /* Find way to implement these if they exist
-        using reverse_iterator       = typename Container::reverse_iterator;
-        using const_reverse_iterator = typename Container::const_reverse_iterator;
-        */
+        using key_type       = KeyType;
+        using mapped_type    = MappedType;
+        using key_equal      = KeyEqual;
+        using value_type     = typename Container::value_type;
+        using size_type      = typename Container::size_type;
+        using different_type = typename Container::difference_type;
+        using iterator       = typename Container::iterator;
+        using const_iterator = typename Container::const_iterator;
 
         static_assert(std::is_same_v<value_type, std::pair<KeyType, MappedType>>, "Container must be of type std::pair");
 
     public: //Constructors
-        template<typename ... Args>
+        template<class ... Args>
         requires std::is_constructible_v<Container, Args...>
         constexpr linear_map(Args&& ... args) 
             noexcept(std::is_nothrow_constructible_v<Container, Args...>):
             _elements(std::forward<Args>(args)...) {}
 
-        constexpr linear_map(const std::initializer_list<value_type>& init_list):
-            _elements(init_list) {}
-
     public:
         [[nodiscard]] constexpr const_iterator find(const key_type& key) const 
         {
-            return find_if(cbegin(), cend(), [&](const value_type& curr) {
-                return key_equal{}(curr.first, key);
-            });
+            //Note: Safe to do since find is a const function
+            return const_cast<linear_map&>(*this).find(key);
         }
 
-        //Todo: Find way to avoid code duplication above!
         [[nodiscard]] constexpr iterator find(const key_type& key)
         {
-            return find_if(begin(), end(), [&](const value_type& curr) {
-                return key_equal{}(curr.first, key);
-            });
+            return std::ranges::find(*this, key, &value_type::first);
         }
 
     public: // Indexing functions
         [[nodiscard]] constexpr const mapped_type& at(const key_type& key) const
         {
-            const_iterator loc = find(key);
+            const const_iterator loc = find(key);
 
             if (loc == cend())
                 throw std::out_of_range("Key not found!");
             else
-                return (*loc).second;
+                return loc->second;
         }
 
         [[nodiscard]] constexpr mapped_type& at(const key_type& key)
@@ -77,22 +63,31 @@ namespace expu {
 
         [[nodiscard]] constexpr const mapped_type& operator[](const key_type& key) const
         {
-            const_iterator loc = find(key);
-
-            return (*loc).second;
+            const const_iterator loc = find(key);
+            //Todo: Add debug check
+            return loc->second;
         }
 
         constexpr mapped_type& operator[](const key_type& key)
         {
-            const_iterator loc = find(key);
+            const const_iterator loc = find(key);
 
             if (loc == cend())
                 //Note: The standard does not require that a SequentialContainer's
-                //emplace_back returns anything, unlike emplace 
-                return (*_elements.emplace(cend(), key, mapped_type())).second;
+                //emplace_back return anything, unlike emplace 
+                return _elements.emplace(cend(), key, mapped_type())->second;
             else
                 //Note: Safe to do since container is non-const
-                return const_cast<mapped_type&>((*loc).second);
+                return const_cast<mapped_type&>(loc->second);
+        }
+
+    public: //Erasion functions
+        constexpr void erase(const key_type& key)
+        {
+            const const_iterator loc = find(key);
+
+            if (loc != cend())
+                _elements.erase(loc);
         }
 
     public: //Comparison operators
@@ -114,9 +109,9 @@ namespace expu {
         }
 
     public: //Size getters
-        [[nodiscard]] constexpr size_type size()     const { return _elements.size(); }
-        [[nodiscard]] constexpr size_type max_size() const { return _elements.max_size(); }
-        [[nodiscard]] constexpr auto empty()         const { return _elements.empty(); }
+        [[nodiscard]] constexpr auto size()     const { return static_cast<size_type>(_elements.size()); }
+        [[nodiscard]] constexpr auto max_size() const { return static_cast<size_type>(_elements.max_size()); }
+        [[nodiscard]] constexpr auto empty()    const { return _elements.empty(); }
 
     public: //Iterator getters
         [[nodiscard]] constexpr iterator begin() noexcept { return _elements.begin(); }
@@ -131,9 +126,8 @@ namespace expu {
         Container _elements;
     };
 
-    template<typename KeyType, typename MappedType, typename Container, typename KeyEqual>
-    constexpr void swap(linear_map<KeyType, MappedType, Container, KeyEqual>& lhs,
-                        linear_map<KeyType, MappedType, Container, KeyEqual>& rhs)
+    template<template_of<linear_map> LinearMap>
+    constexpr void swap(LinearMap& lhs, LinearMap& rhs)
         noexcept(noexcept(lhs.swap(rhs)))
     {
         lhs.swap(rhs);

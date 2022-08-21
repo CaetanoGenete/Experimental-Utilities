@@ -29,12 +29,10 @@ namespace expu {
         constexpr ~seq_iter() noexcept = default;
 
     public:
-
         constexpr seq_iter& operator=(const seq_iter&) = default;
         constexpr seq_iter& operator=(seq_iter&&) noexcept = default;
 
     public:
-
         [[nodiscard]] constexpr reference operator*() const noexcept {
             return _curr;
         }
@@ -43,12 +41,11 @@ namespace expu {
             return &_curr;
         }
 
-        [[nodiscard]] constexpr value_type operator[](difference_type n) const noexcept {
+        [[nodiscard]] constexpr value_type operator[](const difference_type n) const noexcept {
             return static_cast<value_type>(_curr + n);
         }
 
     public:
-
         constexpr seq_iter& operator++() noexcept {
             ++_curr;
             return *this;
@@ -56,7 +53,7 @@ namespace expu {
 
         [[nodiscard("Prefer pre-increment operator.")]] 
         constexpr seq_iter operator++(int) noexcept {
-            seq_iter copy = _curr;
+            const seq_iter copy = _curr;
             ++_curr;
             return copy;
         }
@@ -68,25 +65,23 @@ namespace expu {
 
         [[nodiscard("Prefer pre-increment operator.")]] 
         constexpr seq_iter operator--(int) noexcept {
-            seq_iter copy = _curr;
+            const seq_iter copy = _curr;
             --_curr;
             return copy;
         }
 
     public:
-
-        constexpr seq_iter& operator+=(difference_type n) noexcept {
+        constexpr seq_iter& operator+=(const difference_type n) noexcept {
             _curr += n;
             return *this;
         }
 
-        constexpr seq_iter& operator-=(difference_type n) noexcept {
+        constexpr seq_iter& operator-=(const difference_type n) noexcept {
             _curr -= n;
             return *this;
         }
 
     public:
-
         constexpr void swap(seq_iter& other)
             noexcept(std::is_nothrow_swappable_v<IntType>)
         {
@@ -110,38 +105,38 @@ namespace expu {
         return *lhs == *rhs;
     }
 
-    template<class IntType, class DiffType>
-    constexpr void swap(seq_iter<IntType, DiffType>& lhs, seq_iter<IntType, DiffType>& rhs)
+    template<template_of<seq_iter> SeqIter>
+    constexpr void swap(SeqIter& lhs, SeqIter& rhs)
         noexcept(noexcept(lhs.swap(rhs)))
     {
         lhs.swap(rhs);
     }
 
-    template<class IntType, class DiffType, std::convertible_to<DiffType> Convertible>
-    constexpr seq_iter<IntType, DiffType> operator+(seq_iter<IntType, DiffType> lhs, Convertible n) noexcept
+    template<template_of<seq_iter> SeqIter>
+    constexpr SeqIter operator+(SeqIter lhs, const typename SeqIter::difference_type n) noexcept
     {
         lhs += n;
         return lhs;
     }
 
-    template<class IntType, class DiffType, std::convertible_to<DiffType> Convertible>
-    constexpr seq_iter<IntType, DiffType> operator+(Convertible n, seq_iter<IntType, DiffType> rhs) noexcept
+    template<template_of<seq_iter> SeqIter>
+    constexpr SeqIter operator+(const typename SeqIter::difference_type n, SeqIter rhs) noexcept
     {
         rhs += n;
         return rhs;
     }
 
-    template<class IntType, class DiffType, std::convertible_to<DiffType> Convertible>
-    constexpr seq_iter<IntType, DiffType> operator-(seq_iter<IntType, DiffType> lhs, Convertible n) noexcept
+    template<template_of<seq_iter> SeqIter>
+    constexpr SeqIter operator-(SeqIter lhs, const typename SeqIter::difference_type n) noexcept
     {
         lhs -= n;
         return lhs;
     }
 
-    template<class IntType, class DiffType>
-    constexpr DiffType operator-(const seq_iter<IntType, DiffType>& lhs, const seq_iter<IntType, DiffType>& rhs) noexcept
+    template<template_of<seq_iter> SeqIter>
+    constexpr auto operator-(const SeqIter& lhs, const SeqIter& rhs) noexcept
     {
-        return *lhs - *rhs;
+        return static_cast<SeqIter::difference_type>(*lhs - *rhs);
     }
 
 }

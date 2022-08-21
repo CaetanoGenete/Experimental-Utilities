@@ -18,15 +18,25 @@ set(EXPU_DEPENDENCIES_SOURCE_DIR "${CMAKE_SOURCE_DIR}/deps/")
 set(EXPU_HEADERS
     "include/expu/debug.hpp"
     "include/expu/mem_utils.hpp"
-    "include/expu/test_utils.hpp"
+    
     "include/expu/meta/meta_utils.hpp"
     "include/expu/meta/function_traits.hpp"
+    
     "include/expu/containers/darray.hpp"
     "include/expu/containers/linear_map.hpp"
-    "include/expu/iterators/iter_utils.hpp"
+    "include/expu/containers/fixed_array.hpp"
+    "include/expu/containers/contiguous_container.hpp"
+    
+    "include/expu/iterators/concatenated_iterator.hpp"
     "include/expu/iterators/sorting.hpp"
-    "include/expu/iterators/searching.hpp"
-    "include/expu/iterators/seq_iter.hpp")
+    "include/expu/iterators/seq_iter.hpp"
+
+    "include/expu/testing/checked_allocator.hpp"
+    "include/expu/testing/iterator_downcast.hpp"
+    "include/expu/testing/test_type.hpp"
+    "include/expu/testing/test_allocator.hpp"
+    "include/expu/testing/throw_on_type.hpp"
+    "include/expu/testing/gtest_utils.hpp")
 
 add_library(expu INTERFACE)
 target_include_directories(expu INTERFACE ${EXPU_INCLUDE_DIR})
