@@ -78,7 +78,7 @@ namespace expu {
         }
 
         throw_on_type(const throw_on_type& other)
-            noexcept(std::is_nothrow_copy_constructible_v<Base> && !_will_call_on<decltype(other)...>)
+            noexcept(std::is_nothrow_copy_constructible_v<Base> && !_will_call_on<decltype(other)>)
             requires(std::is_copy_constructible_v<Base>):
             Base(other)
         {
@@ -86,7 +86,7 @@ namespace expu {
         }
 
         throw_on_type(throw_on_type&& other) 
-            noexcept(std::is_nothrow_move_constructible_v<Base> && !_will_call_on<decltype(other)...>)
+            noexcept(std::is_nothrow_move_constructible_v<Base> && !_will_call_on<decltype(other)>)
             requires(std::is_move_constructible_v<Base>) :
             Base(std::move(other))
         {

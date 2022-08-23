@@ -390,7 +390,7 @@ testing::AssertionResult _emplace_or_push_back_sg_tests_common(Callable&& test_c
 }
 
 //Note: Not using darray_trivial_tests because expu::throw_on_type cannot be trivially_copyable
-TYPED_TEST(darray_trivially_destructible_tests, emplace_strong_guarantee)
+TYPED_TEST(darray_trivially_destructible_tests, emplace_back_strong_guarantee)
 {
     EXPU_GUARDED_THROW_ON_TYPE(value_type, TestFixture::value_type, expu::throw_on_comp_equal<int&&>);
     using darray_type = checked_darray<value_type, std::allocator>;
@@ -464,7 +464,7 @@ struct _emplace_pre_check
 TYPED_TEST(darray_trivially_destructible_tests, emplace_with_capacity) 
 {
     constexpr int test_size = 10000;
-    constexpr int step      = 1000;
+    constexpr int step      = test_size/10;
     
     using darray_type = checked_darray<TestFixture::value_type, std::allocator>;
     ASSERT_TRUE(_emplace_tests_common<darray_type>(test_size, step, test_size * 2, _emplace_pre_check<darray_type, true>{}));
@@ -473,7 +473,7 @@ TYPED_TEST(darray_trivially_destructible_tests, emplace_with_capacity)
 TYPED_TEST(darray_trivially_destructible_tests, emplace_requires_resize) 
 {
     constexpr int test_size = 10000;
-    constexpr int step      = 1000;
+    constexpr int step      = test_size/10;
 
     using darray_type = checked_darray<TestFixture::value_type, std::allocator>;
     ASSERT_TRUE(_emplace_tests_common<darray_type>(test_size, step, test_size, _emplace_pre_check<darray_type, false>{}));
@@ -493,8 +493,54 @@ TYPED_TEST(darray_trivially_copyable_tests, emplace_back)
     EXPECT_TRUE(is_equal(arr, first, last));
 }
 
+TYPED_TEST(darray_trivially_destructible_tests, emplace_with_enough_capacity_strong_guarantee) 
+{
+    EXPU_GUARDED_THROW_ON_TYPE(value_type, TestFixture::value_type, expu::throw_on_comp_equal<int&&>);
+    using darray_type = checked_darray<value_type, std::allocator>;
+
+    static_assert(std::is_nothrow_move_assignable_v<value_type> &&
+                 (std::is_nothrow_move_constructible_v<value_type> ||
+                  std::is_nothrow_copy_constructible_v<value_type>),
+        "For emplace to provide strong guarantee (always), The type must not throw on either move or copy constructor and be nothrow move assignable!");
+
+    constexpr int test_size     = 10000;
+    constexpr int step          = test_size / 10;
+    constexpr int emplace_value = -10;
+
+    value_type::callable_type::value = emplace_value;
+
+    darray_type arr(expu::seq_iter(0), expu::seq_iter(test_size));
+    arr.reserve(test_size * 2);
+
+    for (size_t at = 0; at < test_size; at += step) {
+        ASSERT_TRUE(provides_strong_guarantee(arr, &darray_type::template emplace<int&&>, arr.begin() + at, int{ emplace_value })) <<
+            "Failed trying to emplace at index: " << at;
+    }
+}
+
 //////////////////////////////////////DARRAY ASSIGN TESTS///////////////////////////////////////////////////////////////////////////////
 
+template<class IteratorCategory = std::forward_iterator_tag, class ArrayType, std::input_iterator Iterator>
+testing::AssertionResult _darray_assign_tests_common(ArrayType& arr, Iterator first, Iterator last) 
+{
+    using down_iter_type = expu::iterator_downcast<Iterator, IteratorCategory>;
+
+    arr.assign(down_iter_type(first), down_iter_type(last));
+
+    auto failure_message = std::stringstream()
+        << "Failed trying to assign range: "
+        << "[" << *first << ", " << *last << ")";
+
+    auto darray_valid_result = is_darray_valid(arr);
+    if (!darray_valid_result)
+        return darray_valid_result << failure_message.str();
+
+    auto is_equal_result = is_equal(arr, first, last);
+    if(!is_equal_result)
+        return is_equal_result << failure_message.str();
+
+    return testing::AssertionSuccess();
+}
 
 TYPED_TEST(darray_trivial_tests, assign_with_forward_iterator_with_enough_capacity)
 {
@@ -512,13 +558,7 @@ TYPED_TEST(darray_trivial_tests, assign_with_forward_iterator_with_enough_capaci
         ASSERT_LE(assign_size, arr.capacity())
             << "For this test, array must have enough capacity to accept assign range.";
 
-        expu::seq_iter assign_first(-assign_size), assign_last(0);
-        arr.assign(assign_first, assign_last);
-
-        ASSERT_TRUE(is_darray_valid(arr))
-            << "Failed trying to assign range: [" << *assign_first << ", " << *assign_last << ")";
-        ASSERT_TRUE(is_equal(arr, assign_first, assign_last))
-            << "Failed trying to assign range: [" << *assign_first << ", " << *assign_last << ")";
+        ASSERT_TRUE(_darray_assign_tests_common(arr, expu::seq_iter(-assign_size), expu::seq_iter(0)));
 
         //Optimisation (kinda): forward iterator allows for calculation of assign range size.
         ASSERT_EQ(arr.capacity(), max_assign_size)
@@ -535,13 +575,7 @@ TYPED_TEST(darray_trivial_tests, assign_with_forward_iterator_requires_resize)
     ASSERT_LT(arr.capacity(), assign_size)
         << "For this test, array must NOT have enough capacity to accept assign range.";
 
-    expu::seq_iter assign_first(-assign_size), assign_last(0);
-    arr.assign(assign_first, assign_last);
-
-    ASSERT_TRUE(is_darray_valid(arr))
-        << "Failed trying to assign range: [" << *assign_first << ", " << *assign_last << ")";
-    ASSERT_TRUE(is_equal(arr, assign_first, assign_last))
-        << "Failed trying to assign range: [" << *assign_first << ", " << *assign_last << ")";
+    ASSERT_TRUE(_darray_assign_tests_common(arr, expu::seq_iter(-assign_size), expu::seq_iter(0)));
 
     //Optimisation (kinda): forward iterator allows for calculation of assign range size.
     ASSERT_EQ(arr.capacity(), assign_size)
@@ -580,11 +614,12 @@ void _insert_iterator_test_common(int initial_size, int insert_size, size_t capa
     {
         size_t at = static_cast<size_t>(insert_at - init_first);
 
-        auto failure_message = std::stringstream() << "Failed trying to insert at index:" << at;
-
         ArrayType arr(init_first, init_last);
         arr.reserve(capacity);
-        
+
+        auto failure_message = std::stringstream() 
+            << "Failed trying to insert at index:" << at;
+
         ASSERT_TRUE(pre_check(arr)) 
             << failure_message.str();
 

@@ -17,6 +17,15 @@ namespace expu {
         using Iterator::Iterator;
 
     public:
+        constexpr iterator_downcast(const Iterator& iterator)
+            noexcept(std::is_nothrow_copy_constructible_v<Iterator>):
+            Iterator(iterator) {}
+
+        constexpr iterator_downcast(Iterator&& iterator) 
+            noexcept(std::is_nothrow_move_constructible_v<Iterator>):
+            Iterator(std::move(iterator)) {}
+
+    public:
         constexpr iterator_downcast& operator++()
             noexcept(noexcept(Iterator::operator++()))
         {
