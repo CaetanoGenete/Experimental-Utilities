@@ -147,6 +147,14 @@ namespace expu {
     }
 
     template<class Alloc>
+    requires(!std::same_as<_alloc_ptr_t<Alloc>, _alloc_value_t<Alloc>*>)
+    constexpr void destroy_range(Alloc& alloc, const _alloc_ptr_t<Alloc> first, const _alloc_ptr_t<Alloc> last)
+        noexcept(std::is_trivially_destructible_v<_alloc_value_t<Alloc>>)
+    {
+        return destroy_range(alloc, std::to_address(first), std::to_address(last));
+    }
+
+    template<class Alloc>
     struct _partial_range 
     {
     public:
@@ -513,7 +521,8 @@ namespace expu {
         std::input_iterator InputIt,
         std::sentinel_for<InputIt> Sentinel,
         _output_iterator_for<InputIt> OutIt>
-    constexpr OutIt move(InputIt first, Sentinel last, OutIt output) {
+    constexpr OutIt move(InputIt first, Sentinel last, OutIt output) 
+    {
         return copy(
             std::make_move_iterator(first),
             std::move_sentinel(last),
@@ -524,7 +533,8 @@ namespace expu {
         std::bidirectional_iterator BiDirIt,
         std::sentinel_for<BiDirIt> Sentinel,
         _output_iterator_for<BiDirIt> OutIt>
-    constexpr OutIt backward_copy(Sentinel first, BiDirIt last, OutIt output) {
+    constexpr OutIt backward_copy(Sentinel first, BiDirIt last, OutIt output) 
+    {
         if constexpr (_actually_trivially<BiDirIt, OutIt, Sentinel>::assignable) {
             if (!std::is_constant_evaluated())
                 return _range_backward_memmove(first, last, output);
@@ -540,7 +550,8 @@ namespace expu {
         std::bidirectional_iterator BiDirIt,
         std::sentinel_for<BiDirIt> Sentinel,
         _output_iterator_for<BiDirIt> OutIt>
-    constexpr OutIt backward_move(Sentinel first, BiDirIt last, OutIt output) {
+    constexpr OutIt backward_move(Sentinel first, BiDirIt last, OutIt output) 
+    {
         if constexpr (_actually_trivially<BiDirIt, OutIt, Sentinel>::assignable) {
             if (!std::is_constant_evaluated())
                 return _range_backward_memmove(first, last, output);

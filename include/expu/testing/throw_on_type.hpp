@@ -94,6 +94,10 @@ namespace expu {
         }
 
     public:
+        constexpr throw_on_type& operator=(const throw_on_type&) = default;
+        constexpr throw_on_type& operator=(throw_on_type&&) = default;
+
+    public:
         static void reset() 
             requires requires { Callable::reset(); }
         {

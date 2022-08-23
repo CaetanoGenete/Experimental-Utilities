@@ -33,9 +33,9 @@ namespace expu {
     template<class TypeList>
     using as_gtest_TypeList_t = typename as_gtest_TypeList<TypeList>::type;
 
-    
-    template<template_of<::testing::internal::ProxyTypeList> ... TypeLists>
-    struct _cartesian_product<std::tuple<TypeLists...>>
+
+    template<template_of<::testing::internal::ProxyTypeList> ... TypeLists >
+    struct _cartesian_product<TypeLists...>
     {
         using type = as_gtest_TypeList_t<cartesian_product_t<as_tuple_t<TypeLists>...>>;
     };

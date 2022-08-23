@@ -2,8 +2,9 @@
 
 #include <memory>
 #include <algorithm>
-#include <vector>
 #include <sstream>
+
+#include <variant>
 
 #include "expu/containers/darray.hpp"
 #include "expu/containers/fixed_array.hpp"
@@ -62,12 +63,12 @@ testing::AssertionResult is_darray_valid(const expu::darray<Type, expu::checked_
 }
 
 //Todo: Make general for container types if needed
-template<class Type, class Alloc, class Function, class ... Args>
+template<class Type, class Alloc, class Callable, class ... Args>
 testing::AssertionResult provides_weak_guarantee(
-    expu::darray<Type, expu::checked_allocator<Alloc>>& darray, Function function, Args&& ... args) 
+    expu::darray<Type, expu::checked_allocator<Alloc>>& darray, Callable&& function, Args&& ... args) 
 {
     try {
-        std::invoke(function, darray, std::forward<Args>(args)...);
+        std::invoke(std::forward<Callable>(function), darray, std::forward<Args>(args)...);
     }
     catch (...) { return is_darray_valid(darray); }
 }
@@ -88,9 +89,9 @@ testing::AssertionResult _verify_unchanged(const ArrayType& arr, const InputIt o
     return is_equal(arr, old_first, old_last);
 }
 
-template<class Type, class Alloc, class Function, class ... Args>
+template<class Type, class Alloc, class Callable, class ... Args>
 testing::AssertionResult provides_strong_guarantee(
-    expu::darray<Type, expu::checked_allocator<Alloc>>& darray, Function function, Args&& ... args) 
+    expu::darray<Type, expu::checked_allocator<Alloc>>& darray, Callable&& function, Args&& ... args)
 {
     EXPU_NO_THROW_ON(Type, const expu::fixed_array<Type> original_data(darray.begin(), darray.end()));
 
@@ -99,7 +100,7 @@ testing::AssertionResult provides_strong_guarantee(
     const auto old_end      = darray.end();
 
     try {
-        std::invoke(function, darray, std::forward<Args>(args)...);
+        std::invoke(std::forward<Callable>(function), darray, std::forward<Args>(args)...);
     }
     catch (...) {
         if (old_begin != darray.begin())
@@ -119,12 +120,12 @@ testing::AssertionResult provides_strong_guarantee(
 //////////////////////////////////////DARRAY TEST FIXTURES//////////////////////////////////////////////////////////////////////////
 
 template<class TrivialPair>
-struct darray_trival_tests;
+struct darray_trivial_tests;
 
 template<
     std::convertible_to<bool> TriviallyCopyable, 
     std::convertible_to<bool> TriviallyDestructible>
-struct darray_trival_tests<std::tuple<TriviallyCopyable,TriviallyDestructible>>:
+struct darray_trivial_tests<std::tuple<TriviallyCopyable,TriviallyDestructible>>:
     public testing::Test
 {
 private:
@@ -155,11 +156,11 @@ public:
 
 template<class IsTrivial>
 struct darray_trivially_copyable_tests :
-    public darray_trival_tests<std::tuple<IsTrivial, std::true_type>> {};
+    public darray_trivial_tests<std::tuple<IsTrivial, std::true_type>> {};
 
 template<class IsTrivial>
 struct darray_trivially_destructible_tests :
-    public darray_trival_tests<std::tuple<std::false_type, IsTrivial>> {};
+    public darray_trivial_tests<std::tuple<std::false_type, IsTrivial>> {};
 
 //Explicitely writting structs for nice console log information.
 struct is_trivially_copyable      : public std::true_type {};
@@ -173,8 +174,44 @@ using trivial_test_types                = expu::cartesian_product_t<trivially_co
 
 TYPED_TEST_SUITE(darray_trivially_copyable_tests, trivially_copyable_test_types);
 TYPED_TEST_SUITE(darray_trivially_destructible_tests, trivially_destructible_test_types);
-TYPED_TEST_SUITE(darray_trival_tests, trivial_test_types);
+TYPED_TEST_SUITE(darray_trivial_tests, trivial_test_types);
 
+
+template<class Params>
+struct darray_trivial_iterator_tests;
+
+template<
+    class TrviallyConstructible, 
+    class TriviallyDestructible, 
+    class IteratorCategory>
+struct darray_trivial_iterator_tests<std::tuple<TrviallyConstructible, TriviallyDestructible, IteratorCategory>>:
+    public darray_trivial_tests<std::tuple<TrviallyConstructible, TriviallyDestructible>>
+{
+public:
+    using iterator_category = IteratorCategory;
+
+public:
+    template<std::input_iterator Iterator>
+    static constexpr bool satisfies =
+        (std::forward_iterator<Iterator>       || !std::is_base_of_v<std::forward_iterator_tag, iterator_category>)       &&
+        (std::bidirectional_iterator<Iterator> || !std::is_base_of_v<std::bidirectional_iterator_tag, iterator_category>) &&
+        (std::random_access_iterator<Iterator> || !std::is_base_of_v<std::random_access_iterator_tag, iterator_category>);
+
+    template<std::input_iterator Iterator>
+    using iter_cast_t = expu::iterator_downcast<Iterator, iterator_category>;
+};
+
+using darray_trivial_iterator_test_types =
+    expu::cartesian_product_t<
+        trivially_copyable_test_types,
+        trivially_destructible_test_types,
+        testing::Types<
+            std::input_iterator_tag, 
+            std::forward_iterator_tag, 
+            std::bidirectional_iterator_tag,
+            std::random_access_iterator_tag>>;
+
+TYPED_TEST_SUITE(darray_trivial_iterator_tests, darray_trivial_iterator_test_types);
 
 //////////////////////////////////////DARRAY TRAITS TESTS///////////////////////////////////////////////////////////////////////////////
 
@@ -191,42 +228,28 @@ TEST(darray_tests, traits_test)
 //////////////////////////////////////DARRAY ITERATOR CONSTRUCTION TESTS//////////////////////////////////////////////////////////////////////////
 
 
-TYPED_TEST(darray_trival_tests, construct_with_input_iterator)
+TYPED_TEST(darray_trivial_iterator_tests, construct_with_input_iterator)
 {
     constexpr size_t test_size = 10000;
 
-    using iter_type = expu::input_iterator_cast<expu::seq_iter<int>>;
+    using iter_type = typename TestFixture::template iter_cast_t<expu::seq_iter<int>>;
     const iter_type first(0), last(test_size);
-
-    static_assert(std::input_iterator<iter_type> && !std::forward_iterator<iter_type>, 
-        "For this test, type must be no more than input iterator!");
 
     const checked_darray<TestFixture::value_type, std::allocator> arr(first, last);
     ASSERT_TRUE(is_darray_valid(arr));
 
-    //Note: here the iterators are re-constructed because iterator_downcast invalidates.
+    //Note: here the iterators are re-constructed because iterator_downcast may invalidates.
     ASSERT_TRUE(is_equal(arr, iter_type(0), iter_type(test_size)));
-}
 
-TYPED_TEST(darray_trivially_destructible_tests, construct_with_forward_iterators)
-{
-    using darray_type = checked_darray<TestFixture::value_type, std::allocator>;
-
-    constexpr int test_size = 10000;
-    const expu::seq_iter first(0), last(test_size);
-
-    const darray_type arr(first, last);
-    ASSERT_TRUE(is_darray_valid(arr));
-
-    ASSERT_TRUE(is_equal(arr, first, last));
-    ASSERT_EQ(test_size, arr.capacity());
+    if constexpr(std::forward_iterator<iter_type>)
+        ASSERT_EQ(test_size, arr.capacity());
 }
 
 
 //////////////////////////////////////DARRAY SPECIAL CONSTRUCTION TESTS//////////////////////////////////////////////////////////////////////////
 
 
-TYPED_TEST(darray_trival_tests, copy_construct)
+TYPED_TEST(darray_trivial_tests, copy_construct)
 {
     using darray_type = checked_darray<TestFixture::value_type, std::allocator>;
 
@@ -258,7 +281,7 @@ TYPED_TEST(darray_trivially_destructible_tests, move_construct_with_defaulted_al
     ASSERT_TRUE(is_equal(moved, first, last));
 }
 
-TYPED_TEST(darray_trival_tests, move_construct_with_comp_false_allocator)
+TYPED_TEST(darray_trivial_tests, move_construct_with_comp_false_allocator)
 {
     using alloc_type  = expu::test_allocator<TestFixture::value_type, expu::test_alloc_props::always_comp_false>;
     using darray_type = expu::darray<TestFixture::value_type, expu::checked_allocator<alloc_type>>;
@@ -277,7 +300,7 @@ TYPED_TEST(darray_trival_tests, move_construct_with_comp_false_allocator)
 //////////////////////////////////////DARRAY RESERVE TESTS///////////////////////////////////////////////////////////////////////////////
 
 
-TYPED_TEST(darray_trival_tests, reserve_requires_resize)
+TYPED_TEST(darray_trivial_tests, reserve_requires_resize)
 {
     using darray_type = checked_darray<TestFixture::value_type, std::allocator>;
 
@@ -351,40 +374,107 @@ auto _disambiguate(ReturnType(ClassType::* func)(Args...)) { return func; }
 template<class ... Args, class ReturnType>
 auto _disambiguate(ReturnType(*func)(Args...)) { return func; }
 
-//Note: Not using darray_trivial_tests because expu::throw_on_type cannot be trivially_copyable
-TYPED_TEST(darray_trivially_destructible_tests, emplace_strong_guarantee)
+template<class ArrayType, class Callable>
+testing::AssertionResult _emplace_or_push_back_sg_tests_common(Callable&& test_callable) 
 {
-    EXPU_GUARDED_THROW_ON_TYPE(value_type, typename TestFixture::value_type, expu::throw_on_comp_equal<int&>);
-    using darray_type = checked_darray<value_type, std::allocator>;
+    using value_type = typename ArrayType::value_type;
 
     constexpr int test_size = 10000;
-    EXPU_NO_THROW_ON(value_type, darray_type arr(expu::seq_iter(0), expu::seq_iter(test_size)));
+    EXPU_NO_THROW_ON(value_type, ArrayType arr(expu::seq_iter(0), expu::seq_iter(test_size)));
 
     constexpr int emplace_value = test_size * 2;
     value_type::callable_type::value = emplace_value;
 
-    ASSERT_TRUE(provides_strong_guarantee(arr, [](darray_type& arr, int value) {
-        arr.emplace_back(value); //avoid weird template nonsense
-    }, emplace_value));
+    //Constructing int value ensure r-value is passed as argument.
+    return provides_strong_guarantee(arr, std::forward<Callable>(test_callable), int{ emplace_value });
+}
+
+//Note: Not using darray_trivial_tests because expu::throw_on_type cannot be trivially_copyable
+TYPED_TEST(darray_trivially_destructible_tests, emplace_strong_guarantee)
+{
+    EXPU_GUARDED_THROW_ON_TYPE(value_type, TestFixture::value_type, expu::throw_on_comp_equal<int&&>);
+    using darray_type = checked_darray<value_type, std::allocator>;
+
+    _emplace_or_push_back_sg_tests_common<darray_type>(&darray_type::template emplace_back<int>);
+
 }
 
 //Note: Not using darray_trivial_tests because expu::throw_on_type cannot be trivially_copyable
 TYPED_TEST(darray_trivially_destructible_tests, push_back_strong_guarantee)
 {
     using base_type = typename TestFixture::value_type;
-    using throw_on  = expu::throw_on_comp_equal<int, const base_type&>;
 
-    EXPU_GUARDED_THROW_ON_TYPE(value_type, base_type, throw_on);
+    EXPU_GUARDED_THROW_ON_TYPE(value_type, base_type, EXPU_MACRO_ARG(expu::throw_on_comp_equal<int, base_type&&>));
     using darray_type = checked_darray<value_type, std::allocator>;
 
-    constexpr int test_size = 10000;
-    EXPU_NO_THROW_ON(value_type, darray_type arr(expu::seq_iter(0), expu::seq_iter(test_size)));
-
-    constexpr int emplace_value = test_size * 2;
-    throw_on::value = emplace_value;
+    _emplace_or_push_back_sg_tests_common<darray_type>(_disambiguate<value_type&&>(&darray_type::push_back));
     
-    auto push_back_func_ptr = _disambiguate<value_type&&>(&darray_type::push_back);
-    ASSERT_TRUE(provides_strong_guarantee(arr, push_back_func_ptr, emplace_value));
+}
+
+template<class ArrayType, class Callable>
+testing::AssertionResult _emplace_tests_common(int test_size, int step, size_t capacity, Callable&& pre_check) 
+{
+    constexpr int emplace_value = -10;
+
+    if(test_size % step != 0) 
+        return testing::AssertionFailure() << "Test does not emplace at back!";
+
+    expu::seq_iter<int> first(0), last(test_size);
+    expu::seq_iter<int> emplace_iter(-10);
+
+    for (expu::seq_iter<int> at = first; at != last; at += step) {
+        ArrayType arr(first, last);
+        arr.reserve(capacity);
+
+        auto check_result = std::invoke(std::forward<Callable>(pre_check), arr);
+        if (!check_result)
+            return check_result;
+
+        arr.emplace(arr.cbegin() + (at - first), emplace_value);
+
+        auto check_iter = expu::concatenate(first, at, emplace_iter, emplace_iter + 1, at);
+
+        auto is_valid_result = is_darray_valid(arr);
+        if(!is_valid_result)
+            return is_valid_result << ". Failed at: " << *at;
+
+        return is_equal(arr, check_iter, last) << ". Failed at: " << *at;
+    }
+
+    return testing::AssertionSuccess();
+}
+
+template<class ArrayType, bool enough_capacity>
+struct _emplace_pre_check
+{
+    constexpr auto operator()(const ArrayType& arr)
+    {
+        if ((arr.capacity() < arr.size() + 1) == enough_capacity)
+            return testing::AssertionFailure()
+            << "Test requires expu::darray to "
+            << (enough_capacity ? "" : "NOT ")
+            << "have enough capacity to insert one!";
+        else
+            return testing::AssertionSuccess();
+    }
+};
+
+TYPED_TEST(darray_trivially_destructible_tests, emplace_with_capacity) 
+{
+    constexpr int test_size = 10000;
+    constexpr int step      = 1000;
+    
+    using darray_type = checked_darray<TestFixture::value_type, std::allocator>;
+    ASSERT_TRUE(_emplace_tests_common<darray_type>(test_size, step, test_size * 2, _emplace_pre_check<darray_type, true>{}));
+}
+
+TYPED_TEST(darray_trivially_destructible_tests, emplace_requires_resize) 
+{
+    constexpr int test_size = 10000;
+    constexpr int step      = 1000;
+
+    using darray_type = checked_darray<TestFixture::value_type, std::allocator>;
+    ASSERT_TRUE(_emplace_tests_common<darray_type>(test_size, step, test_size, _emplace_pre_check<darray_type, false>{}));
 }
 
 TYPED_TEST(darray_trivially_copyable_tests, emplace_back) 
@@ -401,11 +491,10 @@ TYPED_TEST(darray_trivially_copyable_tests, emplace_back)
     EXPECT_TRUE(is_equal(arr, first, last));
 }
 
-
 //////////////////////////////////////DARRAY ASSIGN TESTS///////////////////////////////////////////////////////////////////////////////
 
 
-TYPED_TEST(darray_trival_tests, assign_with_forward_iterator_with_enough_capacity)
+TYPED_TEST(darray_trivial_tests, assign_with_forward_iterator_with_enough_capacity)
 {
     constexpr int test_size       = 10000;
     constexpr int max_assign_size = test_size * 2;
@@ -435,7 +524,7 @@ TYPED_TEST(darray_trival_tests, assign_with_forward_iterator_with_enough_capacit
     }
 }
 
-TYPED_TEST(darray_trival_tests, assign_with_forward_iterator_requires_resize)
+TYPED_TEST(darray_trivial_tests, assign_with_forward_iterator_requires_resize)
 {
     constexpr int test_size = 10000;
     constexpr int assign_size = test_size * 2;
@@ -510,38 +599,38 @@ void _insert_iterator_test_common(int initial_size, int insert_size, size_t capa
 }
 
 template<class ArrayType, bool more_than_capacity, size_t insert_size>
-struct _insert_pre_check {
+struct _insert_pre_check 
+{
     constexpr auto operator()(const ArrayType& arr)
     {
         if ((arr.capacity() - arr.size() < insert_size) != more_than_capacity)
             return testing::AssertionFailure() 
                 << "Insertion size must be " 
-                << (more_than_capacity ? "greater than" : " less or equal to") 
+                << (more_than_capacity ? "greater than" : " less or equal to")
                 << " unused capacity for this test!";
         else
             return testing::AssertionSuccess();
     }
 };
 
-
-TYPED_TEST(darray_trival_tests, insert_with_forward_iterator_requires_resize) 
+TYPED_TEST(darray_trivial_iterator_tests, insert_requires_resize)
 {
     using array_type = checked_darray<TestFixture::value_type, std::allocator>;
 
     constexpr int test_size = 10000;
     constexpr int insert_size = 2500;
 
-    _insert_iterator_test_common<array_type>(
+    _insert_iterator_test_common<array_type, TestFixture::iterator_category>(
         test_size, insert_size, test_size, 10, _insert_pre_check<array_type, true, insert_size>{});
 }
 
-TYPED_TEST(darray_trival_tests, insert_with_forward_iterator_with_enough_capacity)
+TYPED_TEST(darray_trivial_iterator_tests, insert_with_enough_capacity)
 {
     using array_type = checked_darray<TestFixture::value_type, std::allocator>;
 
     constexpr int test_size = 10000;
     constexpr int insert_size = 2500;
 
-    _insert_iterator_test_common<array_type>(
+    _insert_iterator_test_common<array_type, TestFixture::iterator_category>(
         test_size, insert_size, test_size * 2, 10, _insert_pre_check<array_type, false, insert_size>{});
 }

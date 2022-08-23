@@ -120,7 +120,7 @@ namespace expu {
         }
 
     public:
-        [[nodiscard]] constexpr auto allocate(const size_type n, const_void_pointer hint = nullptr)
+        [[nodiscard]] constexpr pointer allocate(const size_type n, const_void_pointer hint = nullptr)
         {
             _view_check();
             pointer result = _alloc_traits::allocate(*this, n, hint);

@@ -5,6 +5,7 @@
 #include <tuple>
 
 #include "expu/meta/meta_utils.hpp" //For access to tuple_subset
+#include "expu/maths/basic_maths.hpp" //For access to is_odd
 
 namespace expu {
 
@@ -15,7 +16,7 @@ namespace expu {
         using _iter_traits = std::iterator_traits<Iterator>;
 
     public:
-        static_assert(_iterators_count % 2 == 1, "There must be an odd number of iterators!");
+        static_assert(is_odd(_iterators_count), "There must be an odd number of iterators!");
 
         using iterator_category = typename _iter_traits::iterator_category;
         using value_type        = typename _iter_traits::value_type;
@@ -42,7 +43,7 @@ namespace expu {
         using _base_type = _concat_iterator_base<Iterator, _iterators_count>;
 
     public:
-        template<std::convertible_to<Iterator> ... Types>
+        template<class ... Types>
         requires(sizeof...(Types) == _iterators_count)
         constexpr concatenated_iterator(Types&& ... args) : _base_type(std::forward<Types>(args)...)
         {
@@ -96,7 +97,7 @@ namespace expu {
 
     };
 
-    template<class Iterator, std::convertible_to<Iterator> ... Iterators>
+    template<class Iterator, class ... Iterators>
     concatenated_iterator(Iterator&&, Iterators&& ...)->concatenated_iterator<std::decay_t<Iterator>, sizeof...(Iterators) + 1>;
 
     template<std::input_iterator Iterator, size_t _iterators_count, class OtherType>
@@ -105,18 +106,17 @@ namespace expu {
         return !(lhs != rhs);
     }
 
-    template<class Iterator, class ... Iterators>
-    constexpr auto concatenate(Iterator&& first_iter, Iterators&& ... iters) {
-        constexpr size_t iter_count = sizeof...(Iterators) + 1;
+    template<class ... Iterators>
+    constexpr auto concatenate(Iterators&& ... iters) {
+        static constexpr size_t iter_count = sizeof...(Iterators);
 
         //If numbe of iterators is odd, do nothing.
-        if constexpr ((iter_count & 1) == 1) 
-            return concatenated_iterator(std::forward<Iterator>(first_iter), std::forward<Iterators>(iters)...);
+        if constexpr (is_odd(iter_count))
+            return concatenated_iterator(std::forward<Iterators>(iters)...);
         //Otherwise, construct without last iterator
-        else {
-            return std::make_from_tuple<concatenated_iterator<std::decay_t<Iterator>, iter_count - 1>>(
-                tuple_subset(std::make_tuple(std::forward<Iterator>(first_iter), std::forward<Iterators>(iters)...), std::make_index_sequence<iter_count - 1>{}));
-        }
+        else
+            std::apply(&concatenate, tuple_subset(
+                std::make_tuple(std::forward<Iterators>(iters)...), std::make_index_sequence<iter_count - 1>{}));
 
     }
 }

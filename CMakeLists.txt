@@ -21,6 +21,8 @@ set(EXPU_HEADERS
     
     "include/expu/meta/meta_utils.hpp"
     "include/expu/meta/function_traits.hpp"
+
+    "include/expu/maths/basic_maths.hpp"
     
     "include/expu/containers/darray.hpp"
     "include/expu/containers/linear_map.hpp"

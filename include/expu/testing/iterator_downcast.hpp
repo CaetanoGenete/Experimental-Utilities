@@ -60,23 +60,23 @@ namespace expu {
 
     public:
         constexpr iterator_downcast(const iterator_downcast& other) :
-            Iterator(other), invalidated(other.invalidated)
+            Iterator(other), _invalidated(other._invalidated)
         {
-            other.invalidated = true;
+            other._invalidated = true;
         }
 
     public:
         constexpr std::iter_reference_t<Iterator> operator*() const
         {
-            if (invalidated)
+            if (_invalidated)
                 throw std::exception("Iterator has been invalidated!");
             else
                 return Iterator::operator*();
         }
 
-        constexpr auto operator->() const
+        constexpr decltype(auto) operator->() const
         {
-            if (invalidated)
+            if (_invalidated)
                 throw std::exception("Iterator has been invalidated!");
             else
                 return Iterator::operator->();
@@ -99,7 +99,7 @@ namespace expu {
         }
 
     private:
-        mutable bool invalidated = false;
+        mutable bool _invalidated = false;
     };
 
     template<std::input_iterator Iterator> using input_iterator_cast         = iterator_downcast<Iterator, std::input_iterator_tag>;

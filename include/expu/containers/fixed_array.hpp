@@ -73,7 +73,7 @@ namespace expu
             fixed_array(alloc)
         {
             if constexpr (!_alloc_traits::is_always_equal::value) {
-                //On allocators compare false: Individually move, others' data
+                //On allocators compare false: Individually move, other's data
                 //cannot be deallocated using new alloc
                 if (_alloc() != other._alloc()) {
                     _unallocated_assign(
@@ -181,7 +181,8 @@ namespace expu
         }
 
     public:
-        constexpr fixed_array& operator=(const fixed_array& other) {
+        constexpr fixed_array& operator=(const fixed_array& other) 
+        {
             if constexpr (_alloc_traits::propagate_on_container_copy_assignment::value) {
                 if constexpr (!_alloc_traits::is_always_equal::value) {
                     if (_alloc() != other._alloc()) {
@@ -277,7 +278,6 @@ namespace expu
     private:
         compressed_pair<allocator_type, _data_type> _cpair;
     };
-
 }
 
 #endif // !EXPU_FIXED_ARRAY_HPP_INCLUDED
