@@ -430,7 +430,9 @@ testing::AssertionResult _emplace_tests_common(int test_size, int step, size_t c
         if (!check_result)
             return check_result;
 
-        arr.emplace(arr.cbegin() + (at - first), emplace_value);
+        const typename ArrayType::iterator constructed_at = arr.emplace(arr.cbegin() + (at - first), emplace_value);
+        if (constructed_at != (arr.begin() + *at))
+            return testing::AssertionFailure() << "Unexpected emplace return iterator!";
 
         auto check_iter = expu::concatenate(first, at, emplace_iter, emplace_iter + 1, at);
 
