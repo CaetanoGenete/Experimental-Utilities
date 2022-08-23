@@ -45,10 +45,7 @@ namespace expu {
 
     private:
         using _init_memory_container = fixed_array<bool>;
-        //For type-correctness, the raw pointer is extracted from std::to_address
-        using _raw_ptr_type = decltype(std::to_address(std::declval<const_pointer&>()));
-
-        using _map_type = std::map<_raw_ptr_type, _init_memory_container>;
+        using _map_type = std::map<const void*, _init_memory_container>;
 
     public:
         template<class ... Args>
@@ -119,13 +116,19 @@ namespace expu {
             return *this;
         }
 
+    private:
+        [[nodiscard]] constexpr size_t _byte_size(const size_type n) const noexcept
+        {
+            return n * sizeof(value_type);
+        }
+
     public:
         [[nodiscard]] constexpr pointer allocate(const size_type n, const_void_pointer hint = nullptr)
         {
             _view_check();
             pointer result = _alloc_traits::allocate(*this, n, hint);
             //Add memory block 
-            _allocated_memory.try_emplace(std::to_address(result), n, false);
+            _allocated_memory.try_emplace(std::to_address(result), _byte_size(n), false);
             return result;
         }
 
@@ -140,7 +143,7 @@ namespace expu {
 
             _init_memory_container& initialised = loc->second;
 
-            EXPU_VERIFY(initialised.size() == n, "Partially deallocating memory! Prefer full deallocation where possible!");
+            EXPU_VERIFY(initialised.size() == _byte_size(n), "Partially deallocating memory! Prefer full deallocation where possible!");
 
             if constexpr (!std::is_trivially_destructible_v<value_type> || _checked_allocator_throw_on_trivial) {
                 for (bool initialised_element : initialised)
@@ -151,13 +154,12 @@ namespace expu {
         }
 
     private:
-        constexpr _map_type::iterator _mem_first(const void* const xp)
+        [[nodiscard]] constexpr _map_type::iterator _mem_first(const void* const xp)
         {
-            const auto xp_value_ptr = reinterpret_cast<_raw_ptr_type>(xp);
-            auto loc = _allocated_memory.lower_bound(xp_value_ptr);
+            auto loc = _allocated_memory.lower_bound(xp);
 
             if (loc != _allocated_memory.end())
-                if (loc->first == xp_value_ptr)
+                if (loc->first == xp)
                     return loc;
 
             if (_allocated_memory.size())
@@ -166,10 +168,44 @@ namespace expu {
                 return loc;
         }
 
-        constexpr _map_type::const_iterator _mem_first(const void* const xp) const
+        [[nodiscard]] constexpr _map_type::const_iterator _mem_first(const void* const xp) const
         {
             //Note: safe to do since _mem_first is intrinsically const
             return const_cast<_checked_allocator&>(*this)._mem_first(xp);
+        }
+
+    private:
+        template<class Type>
+        [[nodiscard]] constexpr bool _is_all_initialised_to(const _init_memory_container& initialised, size_t at, bool value) const
+        {
+            for (size_t byte = 0; byte < sizeof(Type); ++byte)
+                if (initialised[at + byte] != value)
+                    return false;
+
+            return true;
+        }
+
+        template<class Type>
+        constexpr void _unchecked_mark_initialised(_init_memory_container& initialised, size_t at, bool value)
+        {
+            for (size_t byte = 0; byte < sizeof(Type); ++byte)
+                initialised[at + byte] = value;
+        }
+
+    private:
+        template<class Type>
+        [[nodiscard]] constexpr size_t _get_offset(const volatile void* const first, Type* const last) const noexcept
+        {
+            using char_ptr_type = const volatile char* const;
+            return static_cast<size_t>(reinterpret_cast<char_ptr_type>(last) - static_cast<char_ptr_type>(first));
+        }
+
+    private:
+        template<class Type>
+        constexpr void _check_alignment(size_t at) const
+        {
+            if ((at % sizeof(Type)) != 0)
+                throw std::exception("pointer location does not match alignment!");
         }
 
     public:
@@ -179,18 +215,20 @@ namespace expu {
             _view_check();
             _alloc_traits::construct(*this, xp, std::forward<Args>(args)...);
 
-            const auto loc = _mem_first(xp);
+            const _map_type::iterator loc = _mem_first(xp);
             if (loc != _allocated_memory.end()) {
                 _init_memory_container& initialised = loc->second;
 
-                const auto at = static_cast<size_type>(reinterpret_cast<_raw_ptr_type>(xp) - loc->first);
+                const size_t at = _get_offset(loc->first, xp);
+                _check_alignment<Type>(at);
+
                 if (at < initialised.size()) {
                     if constexpr (!std::is_trivially_destructible_v<value_type> || _checked_allocator_throw_on_trivial) {
-                        if (initialised[at])
+                        if (!_is_all_initialised_to<Type>(initialised, at, false))
                             throw std::exception("Trying to construct atop an already constructed object! Use assignment here!");
                     }
 
-                    initialised[at] = true;
+                    _unchecked_mark_initialised<Type>(initialised, at, true);
                     return;
                 }
             }
@@ -204,19 +242,21 @@ namespace expu {
             _view_check();
             _alloc_traits::destroy(*this, xp);
 
-            const auto loc = _mem_first(xp);
+            const _map_type::iterator loc = _mem_first(xp);
             if (loc != _allocated_memory.end()) {
                 _init_memory_container& initialised = loc->second;
 
-                const auto at = static_cast<size_type>(reinterpret_cast<_raw_ptr_type>(xp) - loc->first);
+                const size_t at = _get_offset(loc->first, xp);
+                _check_alignment<Type>(at);
+
                 if (at < initialised.size()) {
                     //Constructed object is inside this allocated range
                     if constexpr (!std::is_trivially_copyable_v<value_type> || _checked_allocator_throw_on_trivial) {
-                        if (!initialised[at])
+                        if (!_is_all_initialised_to<Type>(initialised, at, true))
                             throw std::exception("Trying to destroy an object which hasn't been constructed!");
                     }
 
-                    initialised[at] = false;
+                    _unchecked_mark_initialised<Type>(initialised, at, false);
                     return;
                 }
             }
@@ -231,13 +271,13 @@ namespace expu {
         }
 
     public:
-        constexpr bool initiliased(const_pointer first, const_pointer last) 
+        [[nodiscard]] constexpr bool initialised(const const_pointer first, const const_pointer last) const
         {
-            const auto loc = _mem_first(std::to_address(first));
+            const _map_type::const_iterator loc = _mem_first(std::to_address(first));
             const _init_memory_container& initialised = loc->second;
 
-            auto at_first = static_cast<size_type>(std::to_address(first) - reinterpret_cast<_raw_ptr_type>(loc->first));
-            auto at_end   = static_cast<size_type>(std::to_address(last) - reinterpret_cast<_raw_ptr_type>(loc->first));
+                  size_t at_first = _get_offset(loc->first, std::to_address(first));
+            const size_t at_end   = _get_offset(loc->first, std::to_address(last));
 
             if (at_end <= initialised.size()) {
                 for (;at_first != at_end; ++at_first)
@@ -249,13 +289,13 @@ namespace expu {
             return true;
         }
 
-        constexpr bool atleast_one_initiliased_in(const_pointer first, const_pointer last)
+        [[nodiscard]] constexpr bool atleast_one_initiliased_in(const const_pointer first, const const_pointer last) const
         {
-            const auto loc = _mem_first(std::to_address(first));
+            const _map_type::const_iterator loc = _mem_first(std::to_address(first));
             const _init_memory_container& initialised = loc->second;
 
-            auto at_first = static_cast<size_type>(std::to_address(first) - reinterpret_cast<_raw_ptr_type>(loc->first));
-            auto at_end   = static_cast<size_type>(std::to_address(last) - reinterpret_cast<_raw_ptr_type>(loc->first));
+                  size_t at_first = _get_offset(loc->first, std::to_address(first));
+            const size_t at_end   = _get_offset(loc->first, std::to_address(last));
 
             if (at_end <= initialised.size()) {
                 for (; at_first != at_end; ++at_first)
@@ -268,15 +308,16 @@ namespace expu {
         }
 
     public:
-        constexpr void _mark_initialised(_raw_ptr_type first, _raw_ptr_type last, bool value) 
+        template<class Type>
+        constexpr void _mark_initialised(Type* const first, Type* const last, bool value) 
         {
             _view_check();
 
-            const auto loc = _mem_first(first);
+            const _map_type::iterator loc = _mem_first(first);
             _init_memory_container& initialised = loc->second;
 
-            auto at_first = static_cast<size_type>(first - reinterpret_cast<_raw_ptr_type>(loc->first));
-            auto at_end   = static_cast<size_type>(last - reinterpret_cast<_raw_ptr_type>(loc->first));
+                  size_t at_first = _get_offset(loc->first, std::to_address(first));
+            const size_t at_end   = _get_offset(loc->first, std::to_address(last));
 
             if (at_end <= initialised.size()) {
                 for (; at_first != at_end; ++at_first) {

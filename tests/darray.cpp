@@ -52,7 +52,7 @@ testing::AssertionResult is_darray_valid(const expu::darray<Type, expu::checked_
             << "expu::darray capacity should not be less than its size!";
 
     if(darray.begin() != darray.end())
-    if (!darray.get_allocator().initiliased(darray.begin()._unwrapped(), darray.end()._unwrapped()))
+    if (!darray.get_allocator().initialised(darray.begin()._unwrapped(), darray.end()._unwrapped()))
         return testing::AssertionFailure() << "Uninitialised gaps found in darray after function call!";
 
     if(darray.size() < darray.capacity())
