@@ -4,6 +4,7 @@
 #include <type_traits>
 
 namespace expu {
+    /*
     template<class BaseType>
     struct _all_special_ctor_deleted_type : public BaseType
     {
@@ -38,6 +39,8 @@ namespace expu {
     constexpr bool calls_copy_ctor_v = calls_special_ctor_v<Type, Arg> &&
                                        !calls_move_ctor_v<Type, Arg>   &&
                                        std::is_copy_constructible_v<Type>;
+
+    */
 }
 
 #endif // !EXPU_META_FUNCTION_TRAITS_HPP_INCLUDED

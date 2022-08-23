@@ -68,7 +68,6 @@ namespace expu {
         [[nodiscard]] constexpr reference operator*() const noexcept
         {
             _verify_dereferencable();
-
             return *_ptr;
         }
 
@@ -136,7 +135,6 @@ namespace expu {
             noexcept
         {
             lhs._verify_cont_compat(rhs);
-
             return static_cast<difference_type>(lhs._ptr - rhs._ptr);
         }
 
@@ -144,7 +142,6 @@ namespace expu {
             noexcept
         {
             lhs._verify_cont_compat(rhs);
-
             return lhs._ptr <=> rhs._ptr;
         }
 
@@ -152,7 +149,6 @@ namespace expu {
             noexcept
         {
             lhs._verify_cont_compat(rhs);
-
             return lhs._ptr == rhs._ptr;
         }
 

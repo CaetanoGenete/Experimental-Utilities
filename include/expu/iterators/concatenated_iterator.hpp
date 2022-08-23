@@ -36,7 +36,7 @@ namespace expu {
     };
 
     //Todo: Add noexcept specifiers
-    template<std::input_iterator Iterator, size_t _iterators_count>
+    template<class Iterator, size_t _iterators_count>
     class concatenated_iterator : public _concat_iterator_base<Iterator, _iterators_count>
     {
     private:
@@ -100,7 +100,7 @@ namespace expu {
     template<class Iterator, class ... Iterators>
     concatenated_iterator(Iterator&&, Iterators&& ...)->concatenated_iterator<std::decay_t<Iterator>, sizeof...(Iterators) + 1>;
 
-    template<std::input_iterator Iterator, size_t _iterators_count, class OtherType>
+    template<class Iterator, size_t _iterators_count, class OtherType>
     constexpr auto operator==(const concatenated_iterator<Iterator, _iterators_count>& lhs, const OtherType& rhs) noexcept
     {
         return !(lhs != rhs);

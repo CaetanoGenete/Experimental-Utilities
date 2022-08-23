@@ -158,10 +158,7 @@ namespace expu
         constexpr void _clear_dealloc() 
         {
             if (_data().first) {
-                destroy_range(
-                    _alloc(),
-                    std::to_address(_data().first),
-                    std::to_address(_data().last));
+                destroy_range(_alloc(), _data().first, _data().last);
 
                 _alloc_traits::deallocate(_alloc(), _data().first, _size());
 
