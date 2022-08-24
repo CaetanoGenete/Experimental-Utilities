@@ -1,5 +1,5 @@
-#ifndef EXPU_THROW_ON_TYPE_HPP_INCLUDED
-#define EXPU_THROW_ON_TYPE_HPP_INCLUDED
+#ifndef EXPU_throw_on_HPP_INCLUDED
+#define EXPU_throw_on_HPP_INCLUDED
 
 #include <atomic>
 #include <exception>
@@ -9,18 +9,14 @@
 #include "expu/meta/meta_utils.hpp"
 
 #define EXPU_NO_THROW_ON(type_name, operation)                         \
-    if constexpr(::expu::_uses_throw_on_type<type_name>)               \
-        type_name::condition = ::expu::throw_conditions::do_not_throw; \
-                                                                       \
+    type_name::condition = ::expu::throw_conditions::do_not_throw;     \
     operation;                                                         \
-                                                                       \
-    if constexpr (::expu::_uses_throw_on_type<type_name>)              \
-        type_name::condition = ::expu::throw_conditions::throw_on_call \
+    type_name::condition = ::expu::throw_conditions::throw_on_call     \
 
 
 #define EXPU_GUARDED_THROW_ON_TYPE(alias, base_type, callable) \
-    using alias = expu::throw_on_type<base_type, callable>;    \
-    expu::_throw_on_type_guard<alias> _##alias##_guard;        \
+    using alias = expu::throw_on<base_type, callable>;         \
+    expu::_throw_on_guard<alias> _##alias##_guard;             \
 
 
 namespace expu {
@@ -33,7 +29,7 @@ namespace expu {
     };
 
     template<class Base, class Callable>
-    class throw_on_type: public Base 
+    class _throw_on_trivially_copyable: public Base 
     {
     public:
         inline static std::atomic<throw_conditions> condition = throw_conditions::throw_on_call;
@@ -41,13 +37,13 @@ namespace expu {
     public:
         using callable_type = Callable;
 
-    private:
+    protected:
         template<class ... Args>
         static constexpr bool _will_call_on = std::predicate<Callable, Args...>;
 
-    private:
+    protected:
         template<class ... Args>
-        void try_throw(Args&& ... args) 
+        void _try_throw(Args&& ... args) 
             noexcept(!_will_call_on<decltype(args)...>)
         {
             if constexpr (_will_call_on<decltype(args)...>) {
@@ -70,32 +66,17 @@ namespace expu {
     public:
         template<class ... Args>
         requires(std::is_constructible_v<Base, Args...>)
-        throw_on_type(Args&& ... args)
+        _throw_on_trivially_copyable(Args&& ... args)
             noexcept(std::is_nothrow_constructible_v<Base, decltype(args)...> && !_will_call_on<decltype(args)...>):
             Base(std::forward<Args>(args)...)
         {
-            try_throw(std::forward<Args>(args)...);
-        }
-
-        throw_on_type(const throw_on_type& other)
-            noexcept(std::is_nothrow_copy_constructible_v<Base> && !_will_call_on<decltype(other)>)
-            requires(std::is_copy_constructible_v<Base>):
-            Base(other)
-        {
-            try_throw(other);
-        }
-
-        throw_on_type(throw_on_type&& other) 
-            noexcept(std::is_nothrow_move_constructible_v<Base> && !_will_call_on<decltype(other)>)
-            requires(std::is_move_constructible_v<Base>) :
-            Base(std::move(other))
-        {
-            try_throw(std::move(other));
+            //Todo: Potentially forwarding objects that have already been moved from on call to delegating construct! Fix.
+            _try_throw(std::forward<Args>(args)...);
         }
 
     public:
-        constexpr throw_on_type& operator=(const throw_on_type&) = default;
-        constexpr throw_on_type& operator=(throw_on_type&&) = default;
+        _throw_on_trivially_copyable& operator=(const _throw_on_trivially_copyable&) = default;
+        _throw_on_trivially_copyable& operator=(_throw_on_trivially_copyable&&) = default;
 
     public:
         static void reset() 
@@ -108,15 +89,49 @@ namespace expu {
 
     };
 
-    template<expu::template_of<throw_on_type> ThrowOnType>
-    struct _throw_on_type_guard {
-        constexpr _throw_on_type_guard()  noexcept { ThrowOnType::reset(); }
-        constexpr ~_throw_on_type_guard() noexcept { ThrowOnType::reset(); }
+    template<class Callable, class Base>
+    struct _throw_on: public _throw_on_trivially_copyable<Callable, Base>
+    {
+    private:
+        using _base_type = _throw_on_trivially_copyable<Callable, Base>;
+
+    public:
+        using _base_type::_base_type;
+
+        _throw_on(const _throw_on& other)
+            noexcept(std::is_nothrow_copy_constructible_v<Base> && !_base_type::template _will_call_on<decltype(other)>)
+            requires(std::is_copy_constructible_v<Base>) :
+            _base_type(other)
+        {
+            _base_type::_try_throw(other);
+        }
+
+        _throw_on(_throw_on&& other)
+            noexcept(std::is_nothrow_move_constructible_v<Base> && !_base_type::template _will_call_on<decltype(other)>)
+            requires(std::is_move_constructible_v<Base>) :
+            _base_type(std::move(other))
+        {
+            //Note: Since other gets moved from, instead pass current instance
+            _base_type::_try_throw(*this);
+        }
+
+    public:
+        _throw_on& operator=(const _throw_on&) = default;
+        _throw_on& operator=(_throw_on&&) = default;
     };
 
+    template<class Base, class Callable>
+    using throw_on = std::conditional_t<std::is_trivially_copyable_v<Base> && !std::predicate<Callable, const _throw_on_trivially_copyable<Base, Callable>&>,
+        _throw_on_trivially_copyable<Base, Callable>,
+        _throw_on<Base, Callable>>;
+
     template<class Type>
-    concept _uses_throw_on_type = requires(Type& type) { 
-        { throw_on_type(type) } -> base_of<Type>; 
+    concept _uses_throw_on_type = template_of<Type, _throw_on> || template_of<Type, _throw_on_trivially_copyable>;
+
+    template<_uses_throw_on_type ThrowOnType>
+    struct _throw_on_guard {
+        constexpr _throw_on_guard()  noexcept { ThrowOnType::reset(); }
+        constexpr ~_throw_on_guard() noexcept { ThrowOnType::reset(); }
     };
 
     struct always_throw {
@@ -207,4 +222,4 @@ namespace expu {
     };
 }
 
-#endif // !EXPU_THROW_ON_TYPE_HPP_INCLUDED
+#endif // !EXPU_throw_on_HPP_INCLUDED

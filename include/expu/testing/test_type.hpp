@@ -276,7 +276,7 @@ namespace expu {
 }
 
 /*
-* Technically, specialisation of is_trivially_copyable(_v) is undefined behaviour,
+* Specialisation of is_trivially_copyable(_v) is undefined behaviour,
 * according to the standard. However, this should function as intended for most
 * compilers. USE AT YOUR OWN RISK.
 */

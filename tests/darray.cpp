@@ -267,7 +267,7 @@ TYPED_TEST(darray_trivial_tests, copy_construct)
 
 TYPED_TEST(darray_trivially_destructible_tests, move_construct_with_defaulted_allocator)
 {
-    using value_type   = expu::throw_on_type<TestFixture::value_type, expu::always_throw>;
+    using value_type   = expu::throw_on<TestFixture::value_type, expu::always_throw>;
     using darray_type = checked_darray<value_type, std::allocator>;
 
     const expu::seq_iter first(0), last(10000);
@@ -321,7 +321,7 @@ TYPED_TEST(darray_trivial_tests, reserve_requires_resize)
 
 TYPED_TEST(darray_trivially_destructible_tests, reserve_with_enough_capacity)
 {
-    using value_type  = expu::throw_on_type<TestFixture::value_type, expu::always_throw>;
+    using value_type  = expu::throw_on<TestFixture::value_type, expu::always_throw>;
     using darray_type = checked_darray<value_type, std::allocator>;
 
     static_assert(!std::is_trivially_copyable_v<value_type>, 
@@ -518,7 +518,9 @@ TYPED_TEST(darray_trivially_destructible_tests, emplace_with_enough_capacity_str
     }
 }
 
+
 //////////////////////////////////////DARRAY ASSIGN TESTS///////////////////////////////////////////////////////////////////////////////
+
 
 template<class IteratorCategory = std::forward_iterator_tag, class ArrayType, std::input_iterator Iterator>
 testing::AssertionResult _darray_assign_tests_common(ArrayType& arr, Iterator first, Iterator last) 
@@ -568,7 +570,7 @@ TYPED_TEST(darray_trivial_tests, assign_with_forward_iterator_with_enough_capaci
 
 TYPED_TEST(darray_trivial_tests, assign_with_forward_iterator_requires_resize)
 {
-    constexpr int test_size = 10000;
+    constexpr int test_size   = 10000;
     constexpr int assign_size = test_size * 2;
 
     checked_darray<TestFixture::value_type, std::allocator> arr(expu::seq_iter(0), expu::seq_iter(test_size));
@@ -671,3 +673,4 @@ TYPED_TEST(darray_trivial_iterator_tests, insert_with_enough_capacity)
     _insert_iterator_test_common<array_type, TestFixture::iterator_category>(
         test_size, insert_size, test_size * 2, 10, _insert_pre_check<array_type, false, insert_size>{});
 }
+
