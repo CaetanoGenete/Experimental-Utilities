@@ -165,11 +165,50 @@ namespace expu {
 #endif 
     };
 
-    template<_ctg_range_pair CtgRangePair>
+    template<class CtgRangePair>
     constexpr void swap(ctg_const_iterator<CtgRangePair>& lhs, ctg_const_iterator<CtgRangePair>& rhs)
         noexcept(noexcept(lhs.swap(rhs)))
     {
         lhs.swap(rhs);
+    }
+
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator++(ctg_const_iterator<CtgRangePair>& iter, int)
+        noexcept(std::is_nothrow_copy_constructible_v<ctg_const_iterator<CtgRangePair>> && noexcept(noexcept(++iter)))
+    {
+        const ctg_const_iterator<CtgRangePair> copy(iter);
+        ++iter;
+        return copy;
+    }
+
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator--(ctg_const_iterator<CtgRangePair>& iter, int)
+        noexcept(std::is_nothrow_copy_constructible_v<ctg_const_iterator<CtgRangePair>> && noexcept(noexcept(--iter)))
+    {
+        const ctg_const_iterator<CtgRangePair> copy(iter);
+        --iter;
+        return copy;
+    }
+
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator+(ctg_const_iterator<CtgRangePair> iter, std::iter_difference_t<ctg_const_iterator<CtgRangePair>> n)
+        noexcept(std::is_nothrow_copy_constructible_v<ctg_const_iterator<CtgRangePair>> && noexcept(noexcept(iter += n)))
+    {
+        return iter += n;
+    }
+
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator+(std::iter_difference_t<ctg_const_iterator<CtgRangePair>> n, const ctg_const_iterator<CtgRangePair>& iter)
+        noexcept(noexcept(iter + n))
+    {
+        return iter + n;
+    }
+
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator-(ctg_const_iterator<CtgRangePair> iter, std::iter_difference_t<ctg_const_iterator<CtgRangePair>> n)
+        noexcept(std::is_nothrow_copy_constructible_v<ctg_const_iterator<CtgRangePair>> && noexcept(noexcept(iter -= n)))
+    {
+        return iter -= n;
     }
 
     template<_ctg_range_pair CtgRangePair>
@@ -236,44 +275,41 @@ namespace expu {
         }
     };
 
-    template<class Iter>
-    concept _expu_ctg_iterator = template_of<Iter, ctg_const_iterator> || template_of<Iter, ctg_iterator>;
-
-    template<_expu_ctg_iterator Iter>
-    [[nodiscard]] constexpr Iter operator++(Iter& iter, int)
-        noexcept(std::is_nothrow_copy_constructible_v<Iter> && noexcept(noexcept(++iter)))
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator++(ctg_iterator<CtgRangePair>& iter, int)
+        noexcept(std::is_nothrow_copy_constructible_v<ctg_iterator<CtgRangePair>> && noexcept(noexcept(++iter)))
     {
-        const Iter copy(iter);
+        const ctg_iterator<CtgRangePair> copy(iter);
         ++iter;
         return copy;
     }
 
-    template<_expu_ctg_iterator Iter>
-    [[nodiscard]] constexpr Iter operator--(Iter& iter, int)
-        noexcept(std::is_nothrow_copy_constructible_v<Iter> && noexcept(noexcept(--iter)))
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator--(ctg_iterator<CtgRangePair>& iter, int)
+        noexcept(std::is_nothrow_copy_constructible_v<ctg_iterator<CtgRangePair>> && noexcept(noexcept(--iter)))
     {
-        const Iter copy(iter);
+        const ctg_iterator<CtgRangePair> copy(iter);
         --iter;
         return copy;
     }
 
-    template<_expu_ctg_iterator Iter>
-    [[nodiscard]] constexpr Iter operator+(Iter iter, std::iter_difference_t<Iter> n)
-        noexcept(std::is_nothrow_copy_constructible_v<Iter> && noexcept(noexcept(iter += n)))
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator+(ctg_iterator<CtgRangePair> iter, std::iter_difference_t<ctg_iterator<CtgRangePair>> n)
+        noexcept(std::is_nothrow_copy_constructible_v<ctg_iterator<CtgRangePair>> && noexcept(noexcept(iter += n)))
     {
         return iter += n;
     }
 
-    template<_expu_ctg_iterator Iter>
-    [[nodiscard]] constexpr Iter operator+(std::iter_difference_t<Iter> n, const Iter& iter)
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator+(std::iter_difference_t<ctg_iterator<CtgRangePair>> n, const ctg_iterator<CtgRangePair>& iter)
         noexcept(noexcept(iter + n))
     {
         return iter + n;
     }
 
-    template<_expu_ctg_iterator Iter>
-    [[nodiscard]] constexpr Iter operator-(Iter iter, std::iter_difference_t<Iter> n)
-        noexcept(std::is_nothrow_copy_constructible_v<Iter> && noexcept(noexcept(iter -= n)))
+    template<class CtgRangePair>
+    [[nodiscard]] constexpr auto operator-(ctg_iterator<CtgRangePair> iter, std::iter_difference_t<ctg_iterator<CtgRangePair>> n)
+        noexcept(std::is_nothrow_copy_constructible_v<ctg_iterator<CtgRangePair>> && noexcept(noexcept(iter -= n)))
     {
         return iter -= n;
     }

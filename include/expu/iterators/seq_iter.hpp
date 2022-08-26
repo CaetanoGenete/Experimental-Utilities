@@ -41,9 +41,18 @@ namespace expu {
             return &_curr;
         }
 
+#ifndef EXPU_MAKE_SEQ_ITER_RANDOM_ACCESS
         [[nodiscard]] constexpr value_type operator[](const difference_type n) const noexcept {
             return static_cast<value_type>(_curr + n);
         }
+#else
+        [[nodiscard]] constexpr reference operator[](const difference_type n) const noexcept {
+            place_holder = return static_cast<value_type>(_curr + n);
+            return place_holder;
+        }
+#endif // !EXPU_MAKE_SEQ_ITER_RANDOM_ACCESS
+
+
 
     public:
         constexpr seq_iter& operator++() noexcept {
@@ -91,6 +100,10 @@ namespace expu {
 
     private:
         mutable value_type _curr;
+#ifdef EXPU_MAKE_SEQ_ITER_RANDOM_ACCESS
+        value_type place_holder;
+#endif // EXPU_MAKE_SEQ_ITER_RANDOM_ACCESS
+
     };
 
     template<class IntType, class DiffType>
@@ -105,38 +118,38 @@ namespace expu {
         return *lhs == *rhs;
     }
 
-    template<template_of<seq_iter> SeqIter>
-    constexpr void swap(SeqIter& lhs, SeqIter& rhs)
+    template<class IntType, class DiffType>
+    constexpr void swap(seq_iter<IntType, DiffType>& lhs, seq_iter<IntType, DiffType>& rhs)
         noexcept(noexcept(lhs.swap(rhs)))
     {
         lhs.swap(rhs);
     }
 
-    template<template_of<seq_iter> SeqIter>
-    constexpr SeqIter operator+(SeqIter lhs, const typename SeqIter::difference_type n) noexcept
+    template<class IntType, class DiffType>
+    constexpr auto operator+(seq_iter<IntType, DiffType> lhs, const std::iter_difference_t<seq_iter<IntType, DiffType>> n) noexcept
     {
         lhs += n;
         return lhs;
     }
 
-    template<template_of<seq_iter> SeqIter>
-    constexpr SeqIter operator+(const typename SeqIter::difference_type n, SeqIter rhs) noexcept
+    template<class IntType, class DiffType>
+    constexpr auto operator+(const std::iter_difference_t<seq_iter<IntType, DiffType>> n, seq_iter<IntType, DiffType> rhs) noexcept
     {
         rhs += n;
         return rhs;
     }
 
-    template<template_of<seq_iter> SeqIter>
-    constexpr SeqIter operator-(SeqIter lhs, const typename SeqIter::difference_type n) noexcept
+    template<class IntType, class DiffType>
+    constexpr auto operator-(seq_iter<IntType, DiffType> lhs, const std::iter_difference_t<seq_iter<IntType, DiffType>> n) noexcept
     {
         lhs -= n;
         return lhs;
     }
 
-    template<template_of<seq_iter> SeqIter>
-    constexpr auto operator-(const SeqIter& lhs, const SeqIter& rhs) noexcept
+    template<class IntType, class DiffType>
+    constexpr auto operator-(const seq_iter<IntType, DiffType>& lhs, const seq_iter<IntType, DiffType>& rhs) noexcept
     {
-        return static_cast<SeqIter::difference_type>(*lhs - *rhs);
+        return static_cast<seq_iter<IntType, DiffType>::difference_type>(*lhs - *rhs);
     }
 
 }

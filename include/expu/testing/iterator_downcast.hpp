@@ -7,7 +7,6 @@ namespace expu {
 
     //Todo: Create overloads for random-access-iterator (+, -, +=, ...);
     template<std::forward_iterator Iterator, class NewCategory>
-    requires(std::is_base_of_v<NewCategory, typename std::iterator_traits<Iterator>::iterator_category>)
     struct iterator_downcast : public Iterator
     {
     public:
@@ -60,6 +59,7 @@ namespace expu {
     };
 
     template<std::input_iterator Iterator>
+    requires(!std::forward_iterator<Iterator>)
     struct iterator_downcast<Iterator, std::input_iterator_tag> : public Iterator {
     public:
         using iterator_category = std::input_iterator_tag;

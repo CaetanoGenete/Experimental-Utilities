@@ -99,7 +99,6 @@ namespace expu {
             }
         }
 
-
     public:
         template<class ... Args>
         requires(std::is_constructible_v<Base, Args...>)
@@ -156,19 +155,25 @@ namespace expu {
         _throw_on& operator=(_throw_on&&) = default;
     };
 
+
     template<class Base, class Callable>
-    using throw_on = std::conditional_t<std::is_trivially_copyable_v<Base> && !std::predicate<Callable, const _trivially_copyable_throw_on<Base, Callable>&>,
+    using throw_on = std::conditional_t<
+        std::is_trivially_copyable_v<Base> && !std::predicate<Callable, const _trivially_copyable_throw_on<Base, Callable>&>,
         _trivially_copyable_throw_on<Base, Callable>,
         _throw_on<Base, Callable>>;
+
 
     template<class Type>
     concept _uses_throw_on_type = template_of<Type, _throw_on> || template_of<Type, _trivially_copyable_throw_on>;
 
+
     template<_uses_throw_on_type ThrowOnType>
-    struct _throw_on_guard {
+    struct _throw_on_guard 
+    {
         constexpr _throw_on_guard()  noexcept { ThrowOnType::reset(); }
         constexpr ~_throw_on_guard() noexcept { ThrowOnType::reset(); }
     };
+
 
     struct always_throw 
     {
@@ -177,6 +182,7 @@ namespace expu {
             return true;
         }
     };
+
 
     template<size_t x, class ... Args>
     struct throw_after_x 
@@ -202,6 +208,7 @@ namespace expu {
         static void reset() noexcept { _counter = 0; }
     };
 
+
     template<size_t x>
     struct always_throw_after_x 
     {
@@ -221,6 +228,7 @@ namespace expu {
     public:
         static void reset() noexcept { _counter = 0; }
     };
+
 
     template<size_t x, class ... Args>
     struct throw_every_x 
@@ -246,6 +254,7 @@ namespace expu {
         static void reset() noexcept { _counter = 0; }
     };
 
+
     template<class Type, class ... Args>
     struct throw_on_comp_equal 
     {
@@ -266,7 +275,6 @@ namespace expu {
     public:
         static void reset() { value = std::nullopt; }
     };
-
 }
 
 #endif // !EXPU_throw_on_HPP_INCLUDED

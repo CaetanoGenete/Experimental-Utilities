@@ -13,22 +13,6 @@ namespace expu {
 
 #define EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(symbol, requires_integral)                                                             \
     template<class OtherFundamentalType>                                                                                            \
-    constexpr friend auto operator symbol(const fundamental_wrapper& lhs, OtherFundamentalType rhs) noexcept                        \
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD_IF_##requires_integral                                                                 \
-    {                                                                                                                               \
-        auto result = lhs.unwrapped symbol rhs;                                                                                     \
-        return fundamental_wrapper<std::decay_t<decltype(result)>>(result);                                                         \
-    }                                                                                                                               \
-                                                                                                                                    \
-    template<class OtherFundamentalType>                                                                                            \
-    constexpr friend auto operator symbol(OtherFundamentalType lhs, const fundamental_wrapper& rhs) noexcept                        \
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD_IF_##requires_integral                                                                 \
-    {                                                                                                                               \
-        auto result = lhs symbol rhs.unwrapped;                                                                                     \
-        return fundamental_wrapper<std::decay_t<decltype(result)>>(result);                                                         \
-    }                                                                                                                               \
-                                                                                                                                    \
-    template<class OtherFundamentalType>                                                                                            \
     constexpr friend auto operator symbol(const fundamental_wrapper& lhs, const fundamental_wrapper<OtherFundamentalType>& rhs)     \
         EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD_IF_##requires_integral                                                                 \
                                                                                                                                     \
@@ -44,14 +28,7 @@ namespace expu {
         unwrapped symbol##= rhs.unwrapped;                                                                                          \
         return *this;                                                                                                               \
     }                                                                                                                               \
-                                                                                                                                    \
-    template<class OtherFundamentalType>                                                                                            \
-    constexpr fundamental_wrapper& operator symbol##=(OtherFundamentalType rhs) noexcept                                            \
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD_IF_##requires_integral                                                                 \
-    {                                                                                                                               \
-        unwrapped symbol##= rhs;                                                                                                    \
-        return *this;                                                                                                               \
-    }
+
 
     template<class FundamentalType>
         requires(std::is_fundamental_v<FundamentalType>)

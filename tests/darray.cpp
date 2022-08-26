@@ -547,7 +547,7 @@ testing::AssertionResult _darray_assign_tests_common(ArrayType& arr, Iterator fi
     return testing::AssertionSuccess();
 }
 
-TYPED_TEST(darray_trivial_tests, assign_with_forward_iterator_with_enough_capacity)
+TYPED_TEST(darray_trivial_iterator_tests, assign_with_forward_iterator_with_enough_capacity)
 {
     constexpr int test_size       = 10000;
     constexpr int max_assign_size = test_size * 2;
@@ -563,7 +563,7 @@ TYPED_TEST(darray_trivial_tests, assign_with_forward_iterator_with_enough_capaci
         ASSERT_LE(assign_size, arr.capacity())
             << "For this test, array must have enough capacity to accept assign range.";
 
-        ASSERT_TRUE(_darray_assign_tests_common(arr, expu::seq_iter(-assign_size), expu::seq_iter(0)));
+        ASSERT_TRUE(_darray_assign_tests_common<TestFixture::iterator_category>(arr, expu::seq_iter(-assign_size), expu::seq_iter(0)));
 
         //Optimisation (kinda): forward iterator allows for calculation of assign range size.
         ASSERT_EQ(arr.capacity(), max_assign_size)
