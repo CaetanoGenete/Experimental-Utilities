@@ -28,8 +28,14 @@ namespace expu {
         call_do_not_throw
     };
 
+    template<class Callable, class Arg, class ... TemplateArgs>
+    concept _predicate_with_deduced_arg = requires(Arg&& arg, Callable callable)
+    {
+        { callable.template operator()<TemplateArgs...>(std::forward<Arg>(arg)) } -> std::convertible_to<bool>;
+    };
+
     template<class Base, class Callable>
-    class _throw_on_trivially_copyable: public Base 
+    class _trivially_copyable_throw_on: public Base 
     {
     public:
         inline static std::atomic<throw_conditions> condition = throw_conditions::throw_on_call;
@@ -37,46 +43,76 @@ namespace expu {
     public:
         using callable_type = Callable;
 
-    protected:
-        template<class ... Args>
-        static constexpr bool _will_call_on = std::predicate<Callable, Args...>;
-
-    protected:
-        template<class ... Args>
-        void _try_throw(Args&& ... args) 
-            noexcept(!_will_call_on<decltype(args)...>)
+    private:
+        template<class Callable2, class ... Args>
+        void _unchecked_try_call(Callable2&& callable, Args&& ... args) 
         {
-            if constexpr (_will_call_on<decltype(args)...>) {
-                switch (condition)
-                {
-                case throw_conditions::throw_on_call:
-                    if (std::invoke(Callable(), std::forward<Args>(args)...))
-                        throw std::exception("Expected throw!");
+            if (condition != throw_conditions::do_not_throw) {
+                const bool marked_to_throw = std::invoke(std::forward<Callable2>(callable), std::forward<Args>(args)...);
 
-                    break;
-                case throw_conditions::call_do_not_throw:
-                    std::invoke(Callable(), std::forward<Args>(args)...);
-
-                default:
-                    break;
-                }
+                if(condition == throw_conditions::throw_on_call && marked_to_throw)
+                    throw std::exception("Expected throw!");
             }
         }
+
+    protected:
+        template<class ... TemplateArgs, class Arg>
+        void _try_throw(Arg&& arg) 
+            requires _predicate_with_deduced_arg<Callable, Arg, TemplateArgs...>
+        {
+            //Callable has an argument that needs to be deduced, cast function pointer
+            auto func_ptr = static_cast<bool(Callable::*)(const std::decay_t<Arg>&)>(&Callable::template operator()<TemplateArgs...>);
+            _unchecked_try_call(func_ptr, Callable(), std::forward<Arg>(arg));
+        }
+
+        template<class ... TemplateArgs, class Arg>
+        void _try_throw(Arg&& arg) 
+            requires _predicate_with_deduced_arg<Callable, Arg, decltype(arg), TemplateArgs...>
+        {
+            //Template argument doesn't need to be deduced, just pass in.
+            _unchecked_try_call(&Callable::template operator()<decltype(arg), TemplateArgs...>, Callable(), std::forward<Arg>(arg));
+        }
+
+        template<class ... TemplateArgs, class Arg>
+        void _try_throw(Arg&& arg) 
+         requires std::predicate<decltype(&Callable::template operator()<TemplateArgs...>), Callable> &&
+                  !_predicate_with_deduced_arg<Callable, Arg, decltype(arg), TemplateArgs...>         &&
+                  !_predicate_with_deduced_arg<Callable, Arg, TemplateArgs...>
+                 
+        {
+            _unchecked_try_call(&Callable::template operator()<TemplateArgs...> , Callable());
+            //Disables 'unused' warning
+            (void)arg;
+        }
+
+        template<class ... TemplateArgs, class Arg>
+        void _try_throw(Arg&& arg) 
+            noexcept(!std::predicate<Callable, Arg> && !std::predicate<Callable>)
+        {
+            if constexpr (std::predicate<Callable, Arg>) {
+                _unchecked_try_call(Callable(), std::forward<Arg>(arg));
+            }
+            else if constexpr (std::predicate<Callable>) {
+                _unchecked_try_call(Callable());
+                //Disables 'unused' warning
+                (void)arg;
+            }
+        }
+
 
     public:
         template<class ... Args>
         requires(std::is_constructible_v<Base, Args...>)
-        _throw_on_trivially_copyable(Args&& ... args)
-            noexcept(std::is_nothrow_constructible_v<Base, decltype(args)...> && !_will_call_on<decltype(args)...>):
+        _trivially_copyable_throw_on(Args&& ... args)
+            noexcept(std::is_nothrow_constructible_v<Base, decltype(args)...> && noexcept(_try_throw<decltype(args)...>(*this))):
             Base(std::forward<Args>(args)...)
         {
-            //Todo: Potentially forwarding objects that have already been moved from on call to delegating construct! Fix.
-            _try_throw(std::forward<Args>(args)...);
+            _try_throw<decltype(args)...>(*this);
         }
 
     public:
-        _throw_on_trivially_copyable& operator=(const _throw_on_trivially_copyable&) = default;
-        _throw_on_trivially_copyable& operator=(_throw_on_trivially_copyable&&) = default;
+        _trivially_copyable_throw_on& operator=(const _trivially_copyable_throw_on&) = default;
+        _trivially_copyable_throw_on& operator=(_trivially_copyable_throw_on&&) = default;
 
     public:
         static void reset() 
@@ -90,29 +126,29 @@ namespace expu {
     };
 
     template<class Callable, class Base>
-    struct _throw_on: public _throw_on_trivially_copyable<Callable, Base>
+    struct _throw_on: public _trivially_copyable_throw_on<Callable, Base>
     {
     private:
-        using _base_type = _throw_on_trivially_copyable<Callable, Base>;
+        using _base_type = _trivially_copyable_throw_on<Callable, Base>;
 
     public:
         using _base_type::_base_type;
 
         _throw_on(const _throw_on& other)
-            noexcept(std::is_nothrow_copy_constructible_v<Base> && !_base_type::template _will_call_on<decltype(other)>)
+            noexcept(std::is_nothrow_copy_constructible_v<Base> && noexcept(_base_type::template _try_throw<decltype(other)>(*this)))
             requires(std::is_copy_constructible_v<Base>) :
             _base_type(other)
         {
-            _base_type::_try_throw(other);
+            _base_type::template _try_throw<decltype(other)>(*this);
         }
 
         _throw_on(_throw_on&& other)
-            noexcept(std::is_nothrow_move_constructible_v<Base> && !_base_type::template _will_call_on<decltype(other)>)
+            noexcept(std::is_nothrow_move_constructible_v<Base> && noexcept(_base_type::template _try_throw<decltype(other)>(*this)))
             requires(std::is_move_constructible_v<Base>) :
             _base_type(std::move(other))
         {
             //Note: Since other gets moved from, instead pass current instance
-            _base_type::_try_throw(*this);
+            _base_type::template _try_throw<decltype(other)>(*this);
         }
 
     public:
@@ -121,12 +157,12 @@ namespace expu {
     };
 
     template<class Base, class Callable>
-    using throw_on = std::conditional_t<std::is_trivially_copyable_v<Base> && !std::predicate<Callable, const _throw_on_trivially_copyable<Base, Callable>&>,
-        _throw_on_trivially_copyable<Base, Callable>,
+    using throw_on = std::conditional_t<std::is_trivially_copyable_v<Base> && !std::predicate<Callable, const _trivially_copyable_throw_on<Base, Callable>&>,
+        _trivially_copyable_throw_on<Base, Callable>,
         _throw_on<Base, Callable>>;
 
     template<class Type>
-    concept _uses_throw_on_type = template_of<Type, _throw_on> || template_of<Type, _throw_on_trivially_copyable>;
+    concept _uses_throw_on_type = template_of<Type, _throw_on> || template_of<Type, _trivially_copyable_throw_on>;
 
     template<_uses_throw_on_type ThrowOnType>
     struct _throw_on_guard {
@@ -134,20 +170,24 @@ namespace expu {
         constexpr ~_throw_on_guard() noexcept { ThrowOnType::reset(); }
     };
 
-    struct always_throw {
+    struct always_throw 
+    {
         template<class ... Args>
-        constexpr bool operator()(Args&& ...) noexcept {
+        constexpr bool operator()() noexcept {
             return true;
         }
     };
 
     template<size_t x, class ... Args>
-    struct throw_after_x {
+    struct throw_after_x 
+    {
     private:
         inline static std::atomic_size_t _counter = 0;
 
     public:
-        constexpr bool operator()(Args&& ...) 
+        template<class ... Args2>
+        requires (std::same_as<Args, Args2> && ...)
+        constexpr bool operator()() 
         {
             static size_t counter = 0;
 
@@ -163,19 +203,19 @@ namespace expu {
     };
 
     template<size_t x>
-    struct always_throw_after_x {
+    struct always_throw_after_x 
+    {
     private:
         inline static std::atomic_size_t _counter = 0;
 
     public:
         template<class ... Args>
-        constexpr bool operator()(Args&& ...) noexcept
+        constexpr bool operator()() noexcept
         {
             if (x < ++_counter)
                 return true;
             else
                 return false;
-
         }
 
     public:
@@ -183,12 +223,15 @@ namespace expu {
     };
 
     template<size_t x, class ... Args>
-    struct throw_every_x {
+    struct throw_every_x 
+    {
     private:
         inline static std::atomic_size_t _counter = 0;
 
     public:
-        constexpr bool operator()(Args&& ...) noexcept
+        template<class ... Args2>
+        requires (std::same_as<Args, Args2> && ...)
+        constexpr bool operator()() noexcept
         {
             if (x < ++_counter) {
                 _counter = 0;
@@ -203,23 +246,27 @@ namespace expu {
         static void reset() noexcept { _counter = 0; }
     };
 
-    template<class Type, class Arg = Type>
-    struct throw_on_comp_equal {
+    template<class Type, class ... Args>
+    struct throw_on_comp_equal 
+    {
     public:
         inline static std::optional<std::decay_t<Type>> value = std::nullopt;
 
     public:
-        constexpr bool operator()(Arg&& arg) 
-            requires std::equality_comparable_with<Type, Arg>
+        template<class Comparator, class ... Args2>
+        requires (std::same_as<Args, Args2> && ...)
+        bool operator()(Comparator&& arg)
         {
             if (value)
-                return value == arg;
+                return value == std::forward<Comparator>(arg);
             else
                 return false;
         }
+
     public:
         static void reset() { value = std::nullopt; }
     };
+
 }
 
 #endif // !EXPU_throw_on_HPP_INCLUDED

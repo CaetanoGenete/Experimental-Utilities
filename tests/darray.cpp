@@ -392,10 +392,10 @@ testing::AssertionResult _emplace_or_push_back_sg_tests_common(Callable&& test_c
 //Note: Not using darray_trivial_tests because expu::throw_on_type cannot be trivially_copyable
 TYPED_TEST(darray_trivially_destructible_tests, emplace_back_strong_guarantee)
 {
-    EXPU_GUARDED_THROW_ON_TYPE(value_type, TestFixture::value_type, expu::throw_on_comp_equal<int&&>);
+    EXPU_GUARDED_THROW_ON_TYPE(value_type, TestFixture::value_type, EXPU_MACRO_ARG(expu::throw_on_comp_equal<int>));
     using darray_type = checked_darray<value_type, std::allocator>;
 
-    _emplace_or_push_back_sg_tests_common<darray_type>(&darray_type::template emplace_back<int>);
+    ASSERT_TRUE(_emplace_or_push_back_sg_tests_common<darray_type>(&darray_type::template emplace_back<int>));
 
 }
 
@@ -404,10 +404,10 @@ TYPED_TEST(darray_trivially_destructible_tests, push_back_strong_guarantee)
 {
     using base_type = typename TestFixture::value_type;
 
-    EXPU_GUARDED_THROW_ON_TYPE(value_type, base_type, EXPU_MACRO_ARG(expu::throw_on_comp_equal<int, base_type&&>));
+    EXPU_GUARDED_THROW_ON_TYPE(value_type, base_type, EXPU_MACRO_ARG(expu::throw_on_comp_equal<int>));
     using darray_type = checked_darray<value_type, std::allocator>;
 
-    _emplace_or_push_back_sg_tests_common<darray_type>(_disambiguate<value_type&&>(&darray_type::push_back));
+    ASSERT_TRUE(_emplace_or_push_back_sg_tests_common<darray_type>(_disambiguate<value_type&&>(&darray_type::push_back)));
     
 }
 
@@ -495,13 +495,16 @@ TYPED_TEST(darray_trivially_copyable_tests, emplace_back)
 
 TYPED_TEST(darray_trivially_destructible_tests, emplace_with_enough_capacity_strong_guarantee) 
 {
-    EXPU_GUARDED_THROW_ON_TYPE(value_type, TestFixture::value_type, expu::throw_on_comp_equal<int&&>);
+    using throw_on = expu::throw_on_comp_equal<int, int&&>;
+    EXPU_GUARDED_THROW_ON_TYPE(value_type, TestFixture::value_type, throw_on);
     using darray_type = checked_darray<value_type, std::allocator>;
 
     static_assert(std::is_nothrow_move_assignable_v<value_type> &&
                  (std::is_nothrow_move_constructible_v<value_type> ||
                   std::is_nothrow_copy_constructible_v<value_type>),
         "For emplace to provide strong guarantee (always), The type must not throw on either move or copy constructor and be nothrow move assignable!");
+
+    static_assert(std::is_nothrow_move_assignable_v<value_type>);
 
     constexpr int test_size     = 10000;
     constexpr int step          = test_size / 10;
