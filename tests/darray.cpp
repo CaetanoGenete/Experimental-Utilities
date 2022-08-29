@@ -12,17 +12,20 @@
 #include "expu/iterators/concatenated_iterator.hpp"
 #include "expu/iterators/seq_iter.hpp"
 
+#include "expu/meta/typelist_set_operations.hpp"
+
 #include "expu/testing/checked_allocator.hpp"
 #include "expu/testing/test_allocator.hpp"
 #include "expu/testing/throw_on_type.hpp"
 #include "expu/testing/iterator_downcast.hpp"
 #include "expu/testing/test_type.hpp"
-#include "expu/testing/gtest_utils.hpp"
 
 template<class Type, template<class ...> class Alloc, class ... ExtraArgs>
 using checked_darray = expu::darray<Type, expu::checked_allocator<Alloc<Type, ExtraArgs...>>>;
 
+
 //////////////////////////////////////DARRAY CHECKS///////////////////////////////////////////////////////////////////////////////
+
 
 template<class Type, class Alloc, std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel>
 testing::AssertionResult is_equal(const expu::darray<Type, Alloc>& arr, InputIt first, const Sentinel last) 
@@ -125,7 +128,7 @@ struct darray_trivial_tests;
 template<
     std::convertible_to<bool> TriviallyCopyable, 
     std::convertible_to<bool> TriviallyDestructible>
-struct darray_trivial_tests<std::tuple<TriviallyCopyable,TriviallyDestructible>>:
+struct darray_trivial_tests<testing::Types<TriviallyCopyable,TriviallyDestructible>>:
     public testing::Test
 {
 private:
@@ -156,11 +159,11 @@ public:
 
 template<class IsTrivial>
 struct darray_trivially_copyable_tests :
-    public darray_trivial_tests<std::tuple<IsTrivial, std::true_type>> {};
+    public darray_trivial_tests<testing::Types<IsTrivial, std::true_type>> {};
 
 template<class IsTrivial>
 struct darray_trivially_destructible_tests :
-    public darray_trivial_tests<std::tuple<std::false_type, IsTrivial>> {};
+    public darray_trivial_tests<testing::Types<std::false_type, IsTrivial>> {};
 
 //Explicitely writting structs for nice console log information.
 struct is_trivially_copyable      : public std::true_type {};
@@ -184,8 +187,8 @@ template<
     class TrviallyConstructible, 
     class TriviallyDestructible, 
     class IteratorCategory>
-struct darray_trivial_iterator_tests<std::tuple<TrviallyConstructible, TriviallyDestructible, IteratorCategory>>:
-    public darray_trivial_tests<std::tuple<TrviallyConstructible, TriviallyDestructible>>
+struct darray_trivial_iterator_tests<testing::Types<TrviallyConstructible, TriviallyDestructible, IteratorCategory>>:
+    public darray_trivial_tests<testing::Types<TrviallyConstructible, TriviallyDestructible>>
 {
 public:
     using iterator_category = IteratorCategory;
@@ -676,4 +679,3 @@ TYPED_TEST(darray_trivial_iterator_tests, insert_with_enough_capacity)
     _insert_iterator_test_common<array_type, TestFixture::iterator_category>(
         test_size, insert_size, test_size * 2, 10, _insert_pre_check<array_type, false, insert_size>{});
 }
-

@@ -31,6 +31,24 @@ namespace expu
         }
     };
 
+    template<class SizeType, class Pointer, class ConstPointer>
+    struct _fixed_array_bool_data 
+    {
+    public:
+        using pointer = Pointer;
+        using const_pointer = ConstPointer;
+
+    public:
+        Pointer first;
+        SizeType size;
+
+        constexpr void steal(_fixed_array_bool_data&& other) noexcept
+        {
+            first = std::exchange(other.first, nullptr);
+            size  = std::exchange(other.size, 0);
+        }
+    };
+
     template<class Type, class Alloc = std::allocator<Type>>
     class fixed_array 
     {
@@ -202,7 +220,7 @@ namespace expu
                     if (_alloc() != other._alloc())
                         return assign(
                             std::make_move_iterator(other._data().first),
-                            std::move_sentinel(other._data().last));
+                            std::make_move_iterator(other._data().last));
                 }
 
                 _clear_dealloc();
@@ -270,7 +288,6 @@ namespace expu
 
         constexpr       _data_type& _data()       noexcept { return _cpair.second(); }
         constexpr const _data_type& _data() const noexcept { return _cpair.second(); }
-
 
     private:
         compressed_pair<allocator_type, _data_type> _cpair;

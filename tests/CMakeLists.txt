@@ -17,11 +17,20 @@ set_target_properties(gtest_main PROPERTIES FOLDER extern)
 set_target_properties(gmock      PROPERTIES FOLDER extern)
 set_target_properties(gmock_main PROPERTIES FOLDER extern)
 
-add_gtest(sequential_containers sequential_containers.cpp expu)
-
 add_gtest(darray "darray.cpp" expu)
-target_compile_definitions(darray 
+target_compile_definitions(
+    darray 
     PRIVATE 
     EXPU_ALLOW_TRIVIAL_TEST_TYPE 
     EXPU_TESTING_THROW_ON_TRIVIAL
     EXPU_CHECKED_ALLOCATOR_LEVEL=1)
+
+add_gtest(fixed_array "fixed_array.cpp" expu)
+target_compile_definitions(
+    fixed_array
+    PRIVATE 
+    EXPU_ALLOW_TRIVIAL_TEST_TYPE 
+    EXPU_TESTING_THROW_ON_TRIVIAL
+)
+
+add_gtest(typelist_set_operations "typelist_set_operations.cpp" expu)

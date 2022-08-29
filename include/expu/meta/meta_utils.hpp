@@ -59,6 +59,7 @@ namespace expu {
         };
     */
 
+
     //////////////INDEX SEQUENCE META HELPERS///////////////////////////////////////////////////////////////
 
 
@@ -77,6 +78,7 @@ namespace expu {
 
     //////////////TUPLE META HELPERS/////////////////////////////////////////////////////////////////////////
 
+
     template<class ... Tuples>
     using tuple_concat_t = decltype(std::tuple_cat(std::declval<Tuples>()...));
     
@@ -89,34 +91,6 @@ namespace expu {
 
     template<class Tuple, class Seq>
     using tuple_subset_t = decltype(tuple_subset(std::declval<Tuple&&>(), std::declval<Seq>()));
-
-
-    template<class Sequence, class ... Tuples>
-    struct from_tuples;
-
-    template<size_t ... Indicies, class ... Tuples>
-    struct from_tuples<std::index_sequence<Indicies...>, Tuples...>
-    {
-        static_assert(sizeof...(Indicies) == sizeof...(Tuples), "Number of indicies does not match number of tuples!");
-
-    public:
-        using type = std::tuple<std::tuple_element_t<Indicies, Tuples>...>;
-    };
-
-
-    template<class Tuple, class Type>
-    struct tuple_has_type;
-
-    template<class Type>
-    struct tuple_has_type<std::tuple<>, Type> :
-        public std::false_type {};
-
-    template<class ... Types, class Type>
-    struct tuple_has_type<std::tuple<Types...>, Type> :
-        public std::bool_constant<(std::is_same_v<Types, Type> || ...)> {};
-
-    template<class Tuple, class Type>
-    constexpr bool tuple_has_type_v = tuple_has_type<Tuple, Type>::value;
 
 
     template<class FirstType, class ... Types>
@@ -175,118 +149,7 @@ namespace expu {
                 typename _cartesian_product<typename _halved_tuple::rhs_type>::type
             >::type;
     };
-
     */
-
-
-    //////////////Constant instantiation depth cartesian product/////////////////////////////////////////////////////
-
-
-    template<size_t ... Sizes>
-    consteval auto _cartesian_indicies() 
-    {
-        constexpr size_t tuples_count = (Sizes * ...);
-        constexpr std::array bases = { Sizes... };
-
-        constexpr auto _indicies_array = []() {
-            std::array<std::array<size_t, bases.size()>, tuples_count> result = {};
-
-            for (size_t elem_index = 0; elem_index < tuples_count; ++elem_index) {
-                size_t value = elem_index;
-
-                for (size_t base_index = 0; base_index < bases.size(); ++base_index) {
-                    result[elem_index][base_index] = value % bases[base_index];
-                    value /= bases[base_index];
-                }
-            }
-
-            return result;
-        }();
-
-        constexpr auto row_to_index_sequence = []<size_t row, size_t ... Indicies>(std::index_sequence<Indicies...>) {
-            return std::index_sequence<_indicies_array[row][Indicies]...>{};
-        };
-
-        return[]<size_t ... RowIndicies, size_t ... ColumnIndicies>(
-            std::index_sequence<RowIndicies...>, 
-            std::index_sequence<ColumnIndicies...> indicies)
-        {
-            return std::make_tuple(row_to_index_sequence.template operator()<RowIndicies>(indicies)...);
-        }
-        (std::make_index_sequence<tuples_count>{}, std::make_index_sequence<sizeof...(Sizes)>{});
-    }
-
-    template<class SequenceTuple, class ... Tuples>
-    struct _cartesian_product_helper;
-
-    template<class ... Sequences, class ... Tuples>
-    struct _cartesian_product_helper<std::tuple<Sequences...>, Tuples...>
-    {
-        using type = tuple_concat_t<std::tuple<typename from_tuples<Sequences, Tuples...>::type>...>;
-    };
-
-    template<class ... Tuples>
-    struct _cartesian_product 
-    {
-        using type = typename _cartesian_product_helper<decltype(_cartesian_indicies<std::tuple_size_v<Tuples>...>()), Tuples...>::type;
-    };
-
-    template<class ... Tuples>
-    using cartesian_product_t = typename _cartesian_product<Tuples...>::type;
-
-
-    //////////////Constant instantiation depth unique tuple types///////////////////////////////////////////
-
-
-    template<size_t ... Indicies>
-    consteval auto _mask_to_sequence(std::index_sequence<Indicies...>) 
-    {
-        constexpr auto sequence = [](std::array<size_t, sizeof...(Indicies)> mask) {
-            std::array<size_t, (Indicies + ...)> sequence = {};
-
-            size_t counter = 0;
-            for (size_t index = 0; index < mask.size(); ++index) {
-                if (mask[index] == 1)
-                    sequence[counter++] = index;
-            }
-
-            return sequence;
-        }({Indicies...});
-
-        return[]<size_t ... Indicies2>(std::index_sequence<Indicies2...>) {
-            return std::index_sequence<sequence[Indicies2]...>{};
-        }(std::make_index_sequence<sequence.size()>{});
-    }
-
-    template<class Tuple, class Sequence>
-    struct _tuple_unique_mask;
-
-    template<class ... Types, size_t ... Indicies>
-    struct _tuple_unique_mask<std::tuple<Types...>, std::index_sequence<Indicies...>> 
-    {
-    private:
-        using tuple_t = std::tuple<Types...>;
-
-    public:
-        using type = std::index_sequence<!tuple_has_type_v<tuple_subset_t<tuple_t, std::make_index_sequence<Indicies>>, Types>...>;
-    };
-
-    template<class Tuple>
-    struct _unique_tuple
-    {
-    private:
-        using _tuple_seq = std::make_index_sequence<std::tuple_size_v<Tuple>>;
-
-    public:
-        using type = tuple_subset_t<Tuple, decltype(_mask_to_sequence(_tuple_unique_mask<Tuple, _tuple_seq>::type()))>;
-    };
-
-    template<class Tuple>
-    using make_unique_tuple = typename _unique_tuple<Tuple>::type;
-
-    template<class ... Types>
-    using unique_tuple = typename _unique_tuple<std::tuple<Types...>>::type;
-
 }
 
 #endif // SMM_TRAITS_EXT_HPP_INCLUDED

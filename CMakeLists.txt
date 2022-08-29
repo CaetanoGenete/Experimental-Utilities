@@ -21,6 +21,8 @@ set(EXPU_HEADERS
     
     "include/expu/meta/meta_utils.hpp"
     "include/expu/meta/function_traits.hpp"
+    "include/expu/meta/function_utils.hpp"
+    "include/expu/meta/typelist_set_operations.hpp"
 
     "include/expu/maths/basic_maths.hpp"
     
@@ -37,8 +39,7 @@ set(EXPU_HEADERS
     "include/expu/testing/iterator_downcast.hpp"
     "include/expu/testing/test_type.hpp"
     "include/expu/testing/test_allocator.hpp"
-    "include/expu/testing/throw_on_type.hpp"
-    "include/expu/testing/gtest_utils.hpp")
+    "include/expu/testing/throw_on_type.hpp")
 
 add_library(expu INTERFACE)
 target_include_directories(expu INTERFACE ${EXPU_INCLUDE_DIR})
