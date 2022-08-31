@@ -32,6 +32,14 @@ namespace expu {
     {
         return indexed_unroll(std::make_index_sequence<n>{}, callable, std::forward<Args>(args)...);
     }
+
+
+
+    template<class ... Args, class ReturnType, class ClassType>
+    auto disambiguate(ReturnType(ClassType::* func)(Args...)) { return func; }
+
+    template<class ... Args, class ReturnType>
+    auto disambiguate(ReturnType(*func)(Args...)) { return func; }
 }
 
 #endif // !EXPU_FUNCTION_UTILS_HPP_INCLUDED

@@ -4,14 +4,14 @@
 #include <algorithm>
 #include <sstream>
 
-#include <variant>
-
 #include "expu/containers/darray.hpp"
 #include "expu/containers/fixed_array.hpp"
 
 #include "expu/iterators/concatenated_iterator.hpp"
 #include "expu/iterators/seq_iter.hpp"
 
+#include "expu/meta/function_utils.hpp"
+#include "expu/meta/meta_utils.hpp"
 #include "expu/meta/typelist_set_operations.hpp"
 
 #include "expu/testing/checked_allocator.hpp"
@@ -372,12 +372,6 @@ TYPED_TEST(darray_trivially_destructible_tests, reserve_strong_guarantee) {
 //////////////////////////////////////DARRAY EMPLACE/PUSH_BACK TESTS///////////////////////////////////////////////////////////////////////////////
 
 
-template<class ... Args, class ReturnType, class ClassType>
-auto _disambiguate(ReturnType(ClassType::* func)(Args...)) { return func; }
-
-template<class ... Args, class ReturnType>
-auto _disambiguate(ReturnType(*func)(Args...)) { return func; }
-
 template<class ArrayType, class Callable>
 testing::AssertionResult _emplace_or_push_back_sg_tests_common(Callable&& test_callable) 
 {
@@ -411,7 +405,7 @@ TYPED_TEST(darray_trivially_destructible_tests, push_back_strong_guarantee)
     EXPU_GUARDED_THROW_ON_TYPE(value_type, base_type, EXPU_MACRO_ARG(expu::throw_on_comp_equal<int>));
     using darray_type = checked_darray<value_type, std::allocator>;
 
-    ASSERT_TRUE(_emplace_or_push_back_sg_tests_common<darray_type>(_disambiguate<value_type&&>(&darray_type::push_back)));
+    ASSERT_TRUE(_emplace_or_push_back_sg_tests_common<darray_type>(expu::disambiguate<value_type&&>(&darray_type::push_back)));
     
 }
 
