@@ -231,7 +231,7 @@ TEST(darray_tests, traits_test)
 //////////////////////////////////////DARRAY ITERATOR CONSTRUCTION TESTS//////////////////////////////////////////////////////////////////////////
 
 
-TYPED_TEST(darray_trivial_iterator_tests, construct_with_input_iterator)
+TYPED_TEST(darray_trivial_iterator_tests, construct_with_iterators)
 {
     constexpr size_t test_size = 10000;
 
@@ -239,6 +239,7 @@ TYPED_TEST(darray_trivial_iterator_tests, construct_with_input_iterator)
     const iter_type first(0), last(test_size);
 
     const checked_darray<TestFixture::value_type, std::allocator> arr(first, last);
+    //std::cout << arr.size() << std::endl;
     ASSERT_TRUE(is_darray_valid(arr));
 
     //Note: here the iterators are re-constructed because iterator_downcast may invalidates.
@@ -516,7 +517,7 @@ TYPED_TEST(darray_trivially_destructible_tests, emplace_with_enough_capacity_str
     value_type::callable_type::value = emplace_value;
 
     darray_type arr(expu::seq_iter(0), expu::seq_iter(test_size));
-    arr.reserve(test_size * 2);
+    arr.reserve(test_size << 1);
 
     for (size_t at = 0; at < test_size; at += step) {
         ASSERT_TRUE(provides_strong_guarantee(arr, &darray_type::template emplace<int&&>, arr.begin() + at, int{ emplace_value })) <<

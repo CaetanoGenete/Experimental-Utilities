@@ -150,6 +150,12 @@ namespace expu {
             >::type;
     };
     */
+
+    template<class Type>
+    constexpr decltype(auto) remove_const_cast(Type&& type) noexcept
+    {
+        return const_cast<std::remove_const_t<decltype(type)>>(std::forward<Type>(type));
+    }
 }
 
 #endif // SMM_TRAITS_EXT_HPP_INCLUDED

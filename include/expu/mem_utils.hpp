@@ -5,6 +5,8 @@
 #include <iterator>    //For access to iterator_traits and iterator concepts
 #include <memory>      //For access to memcpy and memmove
 
+#include "expu/maths/basic_maths.hpp"
+
 #include "expu/meta/meta_utils.hpp"
 
 namespace expu {
@@ -406,6 +408,44 @@ namespace expu {
         return _range_backward_memcpy_or_memmove<false>(first, last, output);
     }
 
+    template<
+        std::contiguous_iterator CtgIt,
+        std::sized_sentinel_for<CtgIt> SizedSentinel
+    >
+    void* set_bits(void* const bits, CtgIt first, const SizedSentinel last)
+    {
+        const size_t bytes_count = right_shift_round_up(std::ranges::distance(first, last), 3);
+
+        auto bytes = static_cast<char*>(bits);
+
+        for (size_t index = 0; index < bytes_count - 1; ++index, ++bytes) {
+            unsigned char value = 0;
+            for (unsigned char mask = 1; mask != 0; mask <<= 1, ++first)
+                value |= mask * static_cast<bool>(*first);
+
+            std::memset(bytes, value, 1);
+        }
+
+        unsigned char value = 0;
+        for (unsigned char mask = 1; first != last; mask <<= 1, ++first)
+            value |= mask * static_cast<bool>(*first);
+
+        std::memset(bytes, value, 1);
+        return ++bytes;
+    }
+
+    template<
+        class Alloc,
+        std::contiguous_iterator CtgIt,
+        std::sized_sentinel_for<CtgIt> SizedSentinel> 
+    void* set_bits(Alloc& alloc, _alloc_value_t<Alloc>* const bits, CtgIt first, const SizedSentinel last) 
+    {
+        void* result = set_bits(bits, first, last);
+        //Todo: Add proper checks here to see if result is aligned properly
+        _mark_initialised_if_checked_allocator(alloc, std::to_address(first), last - first, true);
+
+        return result;
+    }
 
 /////////////////////////////////////UNINITIALISED RANGE FUNCTIONS///////////////////////////////////////////////////////////////////
 
