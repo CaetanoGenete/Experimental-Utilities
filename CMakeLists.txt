@@ -20,7 +20,7 @@ set(EXPU_HEADERS
     "include/expu/mem_utils.hpp"
     
     "include/expu/meta/meta_utils.hpp"
-    "include/expu/meta/function_traits.hpp"
+    #"include/expu/meta/function_traits.hpp"
     "include/expu/meta/function_utils.hpp"
     "include/expu/meta/typelist_set_operations.hpp"
 

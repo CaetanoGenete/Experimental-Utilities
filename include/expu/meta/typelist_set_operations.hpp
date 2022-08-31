@@ -5,6 +5,8 @@
 #include <tuple>
 #include <array>
 
+#include "expu/meta/meta_utils.hpp"
+
 namespace expu {
 
     template<template<class ...> class CastTo, class TypeList>
@@ -257,6 +259,22 @@ namespace expu {
 
     template<class Tuple>
     using unique_typelist_t = typename unique_typelist<Tuple>::type;
+
+
+    //////////////TUPLE SPECIALISATIONS/////////////////////////////////////////////////////////////////////////
+
+
+    template<template_of<std::tuple> ... Tuples>
+    struct _union<Tuples...> 
+    {
+        using type = decltype(std::tuple_cat(std::declval<Tuples>()...));
+    };
+
+    template<size_t ... Indicies, class ... Types>
+    constexpr auto tuple_subset(std::index_sequence<Indicies...>, std::tuple<Types...>&& tuple)
+    {
+        return std::make_tuple(std::get<Indicies>(tuple)...);
+    }
 }
 
 #endif // !EXPU_TYPELIST_SET_OPERATIONS_HPP_INCLUDED

@@ -42,12 +42,13 @@ namespace expu {
         _checked_allocator_base(_checked_allocator_base&& other) noexcept :
             _allocated_memory(std::move(other._allocated_memory)) {}
 
-        ~_checked_allocator_base() {
+        ~_checked_allocator_base() 
+        {
             _check_cleared();
         }
 
     protected:
-        virtual bool _comp_equal(const _checked_allocator_base* other) noexcept = 0;
+        [[nodiscard]] virtual bool _comp_equal(const _checked_allocator_base* other) noexcept = 0;
 
     protected:
         void _check_cleared() const noexcept
@@ -212,12 +213,10 @@ namespace expu {
 
         void deallocate(const pointer pointer, const size_type n) noexcept
         {
-            _alloc_traits::deallocate(*this, pointer, n);
-
             auto loc = _allocated_memory->find(std::to_address(pointer));
 
             EXPU_VERIFY(loc != _allocated_memory->end(), "Trying to deallocated memory which has not been allocated!");
-            EXPU_VERIFY(_comp_equal(loc->second.owner),  "Cannot deallocate memory, this allocator does not compare equal to allocator which allocated this segment.");
+            EXPU_VERIFY(_comp_equal(loc->second.owner) , "Cannot deallocate memory, this allocator does not compare equal to allocator which allocated this segment.");
 
             _init_memory_container& initialised = loc->second.initialised;
 
@@ -228,6 +227,7 @@ namespace expu {
                     EXPU_VERIFY(!initialised_element, "Trying to deallocate memory wherein objects have not been destroyed!");
             }
 
+            _alloc_traits::deallocate(*this, pointer, n);
             _allocated_memory->erase(loc);
         }
 
@@ -235,8 +235,6 @@ namespace expu {
         template<class Type, class ... Args>
         void construct(Type* const xp, Args&& ... args)
         {
-            _alloc_traits::construct(*this, xp, std::forward<Args>(args)...);
-
             const _map_type::iterator loc = _mem_first(xp);
             if (loc != _allocated_memory->end()) {
                 _init_memory_container& initialised = loc->second.initialised;
@@ -250,6 +248,7 @@ namespace expu {
                             throw std::exception("Trying to construct atop an already constructed object! Use assignment here!");
                     }
 
+                    _alloc_traits::construct(*this, xp, std::forward<Args>(args)...);
                     _unchecked_mark_initialised<Type>(initialised, at, true);
                     return;
                 }
@@ -261,8 +260,6 @@ namespace expu {
         template<class Type>
         void destroy(Type* const xp)
         {
-            _alloc_traits::destroy(*this, xp);
-
             const _map_type::iterator loc = _mem_first(xp);
             if (loc != _allocated_memory->end()) {
                 _init_memory_container& initialised = loc->second.initialised;
@@ -277,6 +274,7 @@ namespace expu {
                             throw std::exception("Trying to destroy an object which hasn't been constructed!");
                     }
 
+                    _alloc_traits::destroy(*this, xp);
                     _unchecked_mark_initialised<Type>(initialised, at, false);
                     return;
                 }

@@ -2,11 +2,7 @@
 #define SMM_TRAITS_EXT_HPP_INCLUDED
 
 #include <type_traits>
-#include <string>
 #include <memory>
-#include <tuple>
-#include <array>
-#include <concepts>
 
 namespace expu {
 
@@ -76,28 +72,14 @@ namespace expu {
     using make_index_sequence_from = typename _shift_sequence_by<from, std::make_index_sequence<to - from>>::type;
 
 
-    //////////////TUPLE META HELPERS/////////////////////////////////////////////////////////////////////////
-
-
-    template<class ... Tuples>
-    using tuple_concat_t = decltype(std::tuple_cat(std::declval<Tuples>()...));
-    
-
-    template<class ... Types, size_t ... Indicies>
-    constexpr auto tuple_subset(std::tuple<Types...>&& tuple, std::index_sequence<Indicies...>)
-    {
-        return std::make_tuple(std::get<Indicies>(tuple)...);
-    }
-
-    template<class Tuple, class Seq>
-    using tuple_subset_t = decltype(tuple_subset(std::declval<Tuple&&>(), std::declval<Seq>()));
-
-
     template<class FirstType, class ... Types>
     using first_t = FirstType;
 
     /*
     LEGACY: log(n) instantiation depth cartesian product on std::tuple
+
+    template<class ... Tuples>
+    using tuple_concat_t = decltype(std::tuple_cat(std::declval<Tuples>()...));
 
     template<class Tuple>
     struct halve_tuple {

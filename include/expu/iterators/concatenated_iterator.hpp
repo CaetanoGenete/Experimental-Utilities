@@ -4,7 +4,7 @@
 #include <iterator>
 #include <tuple>
 
-#include "expu/meta/meta_utils.hpp" //For access to tuple_subset
+#include "expu/meta/typelist_set_operations.hpp" //For access to tuple_subset
 #include "expu/maths/basic_maths.hpp" //For access to is_odd
 
 namespace expu {
@@ -116,7 +116,7 @@ namespace expu {
         //Otherwise, construct without last iterator
         else
             std::apply(&concatenate, tuple_subset(
-                std::make_tuple(std::forward<Iterators>(iters)...), std::make_index_sequence<iter_count - 1>{}));
+                std::make_index_sequence<iter_count - 1>{}, std::make_tuple(std::forward<Iterators>(iters)...)));
 
     }
 }
