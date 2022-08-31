@@ -50,16 +50,18 @@ namespace expu {
 
     template<class Type, test_alloc_props ... Properties>
     requires(_contains<test_alloc_props::always_comp_false, Properties...>)
-    constexpr bool operator==(const test_allocator<Type, Properties...>&, const test_allocator<Type, Properties...>&)
+    constexpr bool operator==(const test_allocator<Type, Properties...>& lhs, const test_allocator<Type, Properties...>& rhs)
     {
-        return false;
+        //Only compare equal if they are the exact same instance
+        return &lhs == &rhs;
     }
 
     template<class Type, test_alloc_props ... Properties>
     requires(_contains<test_alloc_props::always_comp_false, Properties...>)
-    constexpr bool operator!=(const test_allocator<Type, Properties...>&, const test_allocator<Type, Properties...>&)
+    constexpr bool operator!=(const test_allocator<Type, Properties...>& lhs, const test_allocator<Type, Properties...>& rhs)
     {
-        return true;
+        //Compare not_equal if they are not the exact same instance
+        return &lhs != &rhs;
     }
 }
 

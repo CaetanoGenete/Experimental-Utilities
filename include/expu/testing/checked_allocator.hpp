@@ -14,17 +14,98 @@
 #define EXPU_CHECKED_ALLOCATOR_LEVEL 1
 #endif // !EXPU_CHECKED_ALLOCATOR_LEVEL
 
-
 namespace expu {
 
-#ifdef EXPU_TESTING_THROW_ON_TRIVIAL
-    constexpr bool _checked_allocator_throw_on_trivial = true;
-#else
-    constexpr bool _checked_allocator_throw_on_trivial = false;
-#endif
+    class _checked_allocator_base {
+    protected:
+        using _init_memory_container = fixed_array<bool>;
 
-    template<class Allocator>
-    class _checked_allocator : public Allocator
+        //Todo: initalised is only being used for size and index operator, consider providing these functions here
+        struct _memory 
+        {
+            const _checked_allocator_base* owner;
+            _init_memory_container initialised;
+
+            _memory(const _checked_allocator_base* owner, size_t size):
+                owner(owner), initialised(size, false) {}
+        };
+
+        using _map_type = std::map<const void*, _memory>;
+
+    protected:
+        _checked_allocator_base() noexcept:
+            _allocated_memory(std::make_shared<_map_type>()) {}
+
+        _checked_allocator_base(const _checked_allocator_base& other) noexcept :
+            _allocated_memory(other._allocated_memory) {}
+
+        _checked_allocator_base(_checked_allocator_base&& other) noexcept :
+            _allocated_memory(std::move(other._allocated_memory)) {}
+
+        ~_checked_allocator_base() {
+            _check_cleared();
+        }
+
+    protected:
+        virtual bool _comp_equal(const _checked_allocator_base* other) noexcept = 0;
+
+    protected:
+        void _check_cleared() const noexcept
+        {
+            //Ensure this is not a moved_from object
+            if (_allocated_memory)
+                EXPU_VERIFY(!(_allocated_memory->size() && _allocated_memory.use_count() == 1), "Not all memory allocated has been deallocated!");
+        }
+
+    protected: //Memory search helper functions
+        [[nodiscard]] _map_type::iterator _mem_first_common(const void* const xp) const
+        {
+            _map_type::iterator loc = _allocated_memory->lower_bound(xp);
+
+            if (loc != _allocated_memory->end())
+                if (loc->first == xp)
+                    return loc;
+
+            if (_allocated_memory->size())
+                return --loc;
+            else
+                return loc;
+        }
+
+        [[nodiscard]] _map_type::const_iterator _mem_first(const void* const xp) const { return _mem_first_common(xp); }
+        [[nodiscard]] _map_type::iterator       _mem_first(const void* const xp)       { return _mem_first_common(xp); }
+
+    protected: //initialised memory helper functions
+        template<class Type>
+        [[nodiscard]] constexpr bool _is_all_initialised_to(const _init_memory_container& initialised, size_t at, bool value) const
+        {
+            for (size_t byte = 0; byte < sizeof(Type); ++byte)
+                if (initialised[at + byte] != value)
+                    return false;
+
+            return true;
+        }
+
+        template<class Type>
+        constexpr void _unchecked_mark_initialised(_init_memory_container& initialised, size_t at, bool value)
+        {
+            for (size_t byte = 0; byte < sizeof(Type); ++byte)
+                initialised[at + byte] = value;
+        }
+
+        template<class Type>
+        constexpr void _check_alignment(size_t at) const
+        {
+            if ((at % sizeof(Type)) != 0)
+                throw std::exception("pointer location does not match alignment!");
+        }
+
+    protected:
+        std::shared_ptr<_map_type> _allocated_memory;
+    };
+
+    template<class Allocator, bool _throw_on_trivial>
+    class _checked_allocator : public Allocator, public _checked_allocator_base
     {
     private:
         using _alloc_traits = std::allocator_traits<Allocator>;
@@ -43,40 +124,35 @@ namespace expu {
         using propagate_on_container_move_assignment = _alloc_traits::propagate_on_container_move_assignment;
         using propagate_on_container_swap            = _alloc_traits::propagate_on_container_swap;
 
-    private:
-        using _init_memory_container = fixed_array<bool>;
-        using _map_type = std::map<const void*, _init_memory_container>;
+    public: //Constructors and destructor
+        using _checked_allocator_base::_allocated_memory;
 
-    public:
         template<class ... Args>
         requires(std::is_constructible_v<Allocator, Args...>)
-        constexpr _checked_allocator(Args&& ... args) :
+        _checked_allocator(Args&& ... args) :
             Allocator(std::forward<Args>(args)...), 
-            _allocated_memory(std::make_shared<_map_type>()) {}
+            _checked_allocator_base() {}
 
-        constexpr _checked_allocator(const _checked_allocator& other) noexcept:
+        template<class OtherAllocator>
+        _checked_allocator(const _checked_allocator<OtherAllocator, _throw_on_trivial>& other):
+            Allocator(other),
+            _checked_allocator_base(other) {}
+
+        _checked_allocator(const _checked_allocator& other) noexcept:
             Allocator(other), 
-            _allocated_memory(other._allocated_memory) {}
+            _checked_allocator_base(other) {}
 
-        constexpr _checked_allocator(_checked_allocator&& other) noexcept:
+        _checked_allocator(_checked_allocator&& other) noexcept:
             Allocator(std::move(other)), 
-            _allocated_memory(std::move(other._allocated_memory)) {}
+            _checked_allocator_base(std::move(other)) {}
 
-        constexpr ~_checked_allocator() noexcept
+        _checked_allocator select_on_container_copy_construction() const
         {
-            _check_cleared();
+            return _alloc_traits::select_on_container_copy_construction(*this);
         }
 
-    private:
-        constexpr void _check_cleared() const noexcept
-        {
-            //Ensure this is not a moved_from object
-            if(_allocated_memory)
-                EXPU_VERIFY(!(_allocated_memory->size() && _allocated_memory.use_count() == 1), "Not all memory allocated has been deallocated!");
-        }
-
-    public:
-        constexpr _checked_allocator& operator=(const _checked_allocator& other) noexcept
+    public: //Assignment operators
+        _checked_allocator& operator=(const _checked_allocator& other) noexcept
         {
             Allocator::operator=(other);
 
@@ -90,7 +166,7 @@ namespace expu {
             return *this;
         }
 
-        constexpr _checked_allocator& operator=(_checked_allocator&& other) noexcept
+        _checked_allocator& operator=(_checked_allocator&& other) noexcept
         {
             Allocator::operator=(std::move(other));
 
@@ -103,34 +179,51 @@ namespace expu {
             return *this;
         }
 
-    private:
+    public:
+        bool _comp_equal(const _checked_allocator_base* other) noexcept override 
+        {
+            if (typeid(*other) == typeid(*this))
+                return static_cast<const _checked_allocator&>(*other) == *this;
+            else
+                return false;
+        }
+
+
+    private: //Size helper functions
         [[nodiscard]] constexpr size_t _byte_size(const size_type n) const noexcept
         {
             return n * sizeof(value_type);
         }
 
-    public:
-        [[nodiscard]] constexpr pointer allocate(const size_type n, const_void_pointer hint = nullptr)
+        [[nodiscard]] constexpr size_t _get_offset(const volatile void* const first, const volatile void* const last) const noexcept
+        {
+            using char_ptr_type = const volatile char* const;
+            return static_cast<size_t>(static_cast<char_ptr_type>(last) - static_cast<char_ptr_type>(first));
+        }
+
+    public: //Allocate and deallocate
+        [[nodiscard]] pointer allocate(const size_type n, const_void_pointer hint = nullptr)
         {
             pointer result = _alloc_traits::allocate(*this, n, hint);
             //Add memory block 
-            _allocated_memory->try_emplace(std::to_address(result), _byte_size(n), false);
+            _allocated_memory->try_emplace(std::to_address(result), this, _byte_size(n));
             return result;
         }
 
-        constexpr void deallocate(const pointer pointer, const size_type n) noexcept
+        void deallocate(const pointer pointer, const size_type n) noexcept
         {
             _alloc_traits::deallocate(*this, pointer, n);
 
             auto loc = _allocated_memory->find(std::to_address(pointer));
 
             EXPU_VERIFY(loc != _allocated_memory->end(), "Trying to deallocated memory which has not been allocated!");
+            EXPU_VERIFY(_comp_equal(loc->second.owner),  "Cannot deallocate memory, this allocator does not compare equal to allocator which allocated this segment.");
 
-            _init_memory_container& initialised = loc->second;
+            _init_memory_container& initialised = loc->second.initialised;
 
             EXPU_VERIFY(initialised.size() == _byte_size(n), "Partially deallocating memory! Prefer full deallocation where possible!");
 
-            if constexpr (!std::is_trivially_destructible_v<value_type> || _checked_allocator_throw_on_trivial) {
+            if constexpr (!std::is_trivially_destructible_v<value_type> || _throw_on_trivial) {
                 for (bool initialised_element : initialised)
                     EXPU_VERIFY(!initialised_element, "Trying to deallocate memory wherein objects have not been destroyed!");
             }
@@ -138,76 +231,21 @@ namespace expu {
             _allocated_memory->erase(loc);
         }
 
-    private:
-        [[nodiscard]] constexpr _map_type::iterator _mem_first(const void* const xp)
-        {
-            auto loc = _allocated_memory->lower_bound(xp);
-
-            if (loc != _allocated_memory->end())
-                if (loc->first == xp)
-                    return loc;
-
-            if (_allocated_memory->size())
-                return --loc;
-            else
-                return loc;
-        }
-
-        [[nodiscard]] constexpr _map_type::const_iterator _mem_first(const void* const xp) const
-        {
-            //Note: safe to do since _mem_first is intrinsically const
-            return const_cast<_checked_allocator&>(*this)._mem_first(xp);
-        }
-
-    private:
-        template<class Type>
-        [[nodiscard]] constexpr bool _is_all_initialised_to(const _init_memory_container& initialised, size_t at, bool value) const
-        {
-            for (size_t byte = 0; byte < sizeof(Type); ++byte)
-                if (initialised[at + byte] != value)
-                    return false;
-
-            return true;
-        }
-
-        template<class Type>
-        constexpr void _unchecked_mark_initialised(_init_memory_container& initialised, size_t at, bool value)
-        {
-            for (size_t byte = 0; byte < sizeof(Type); ++byte)
-                initialised[at + byte] = value;
-        }
-
-    private:
-        template<class Type>
-        [[nodiscard]] constexpr size_t _get_offset(const volatile void* const first, Type* const last) const noexcept
-        {
-            using char_ptr_type = const volatile char* const;
-            return static_cast<size_t>(reinterpret_cast<char_ptr_type>(last) - static_cast<char_ptr_type>(first));
-        }
-
-    private:
-        template<class Type>
-        constexpr void _check_alignment(size_t at) const
-        {
-            if ((at % sizeof(Type)) != 0)
-                throw std::exception("pointer location does not match alignment!");
-        }
-
-    public:
+    public: //Construction and destruction functions
         template<class Type, class ... Args>
-        constexpr void construct(Type* const xp, Args&& ... args)
+        void construct(Type* const xp, Args&& ... args)
         {
             _alloc_traits::construct(*this, xp, std::forward<Args>(args)...);
 
             const _map_type::iterator loc = _mem_first(xp);
             if (loc != _allocated_memory->end()) {
-                _init_memory_container& initialised = loc->second;
+                _init_memory_container& initialised = loc->second.initialised;
 
                 const size_t at = _get_offset(loc->first, xp);
                 _check_alignment<Type>(at);
 
                 if (at < initialised.size()) {
-                    if constexpr (!std::is_trivially_destructible_v<value_type> || _checked_allocator_throw_on_trivial) {
+                    if constexpr (!std::is_trivially_destructible_v<value_type> || _throw_on_trivial) {
                         if (!_is_all_initialised_to<Type>(initialised, at, false))
                             throw std::exception("Trying to construct atop an already constructed object! Use assignment here!");
                     }
@@ -221,20 +259,20 @@ namespace expu {
         }
 
         template<class Type>
-        constexpr void destroy(Type* const xp)
+        void destroy(Type* const xp)
         {
             _alloc_traits::destroy(*this, xp);
 
             const _map_type::iterator loc = _mem_first(xp);
             if (loc != _allocated_memory->end()) {
-                _init_memory_container& initialised = loc->second;
+                _init_memory_container& initialised = loc->second.initialised;
 
                 const size_t at = _get_offset(loc->first, xp);
                 _check_alignment<Type>(at);
 
                 if (at < initialised.size()) {
                     //Constructed object is inside this allocated range
-                    if constexpr (!std::is_trivially_copyable_v<value_type> || _checked_allocator_throw_on_trivial) {
+                    if constexpr (!std::is_trivially_copyable_v<value_type> || _throw_on_trivial) {
                         if (!_is_all_initialised_to<Type>(initialised, at, true))
                             throw std::exception("Trying to destroy an object which hasn't been constructed!");
                     }
@@ -247,16 +285,11 @@ namespace expu {
             throw std::exception("Object is not within memory allocated by this allocator!");
         }
 
-        constexpr _checked_allocator select_on_container_copy_construction() const
-        {
-            return _alloc_traits::select_on_container_copy_construction(*this);
-        }
-
-    public:
-        [[nodiscard]] constexpr bool initialised(const const_pointer first, const const_pointer last) const
+    public: //Public getters for initialised memory
+        [[nodiscard]] bool initialised(const const_pointer first, const const_pointer last) const
         {
             const _map_type::const_iterator loc = _mem_first(std::to_address(first));
-            const _init_memory_container& initialised = loc->second;
+            const _init_memory_container& initialised = loc->second.initialised;
 
                   size_t at_first = _get_offset(loc->first, std::to_address(first));
             const size_t at_end   = _get_offset(loc->first, std::to_address(last));
@@ -271,10 +304,10 @@ namespace expu {
             return true;
         }
 
-        [[nodiscard]] constexpr bool atleast_one_initiliased_in(const const_pointer first, const const_pointer last) const
+        [[nodiscard]] bool atleast_one_initiliased_in(const const_pointer first, const const_pointer last) const
         {
             const _map_type::const_iterator loc = _mem_first(std::to_address(first));
-            const _init_memory_container& initialised = loc->second;
+            const _init_memory_container& initialised = loc->second.initialised;
 
                   size_t at_first = _get_offset(loc->first, std::to_address(first));
             const size_t at_end   = _get_offset(loc->first, std::to_address(last));
@@ -291,10 +324,10 @@ namespace expu {
 
     public:
         template<class Type>
-        constexpr void _mark_initialised(Type* const first, Type* const last, bool value) 
+        void _mark_initialised(Type* const first, Type* const last, bool value) 
         {
             const _map_type::iterator loc = _mem_first(first);
-            _init_memory_container& initialised = loc->second;
+            _init_memory_container& initialised = loc->second.initialised;
 
                   size_t at_first = _get_offset(loc->first, std::to_address(first));
             const size_t at_end   = _get_offset(loc->first, std::to_address(last));
@@ -310,15 +343,12 @@ namespace expu {
             else
                 throw std::out_of_range("Some or all of the objects being marked are not within memory allocated by allocator.");
         }
-
-    private:
-        std::shared_ptr<_map_type> _allocated_memory;
     };
 
 #if EXPU_CHECKED_ALLOCATOR_LEVEL > 0
-    template<class Allocator> using checked_allocator = _checked_allocator<Allocator>;
+    template<class Allocator, bool _throw_on_trivial = false> using checked_allocator = _checked_allocator<Allocator, _throw_on_trivial>;
 #else
-    template<class Allocator> using checked_allocator = Allocator;
+    template<class Allocator, bool> using checked_allocator = Allocator;
 #endif // EXPU_CHECKED_ALLOCATOR_LEVEL > 0
 }
 

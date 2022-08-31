@@ -21,7 +21,7 @@
 #include "expu/testing/test_type.hpp"
 
 template<class Type, template<class ...> class Alloc, class ... ExtraArgs>
-using checked_darray = expu::darray<Type, expu::checked_allocator<Alloc<Type, ExtraArgs...>>>;
+using checked_darray = expu::darray<Type, expu::checked_allocator<Alloc<Type, ExtraArgs...>, true>>;
 
 
 //////////////////////////////////////DARRAY CHECKS///////////////////////////////////////////////////////////////////////////////
@@ -47,7 +47,7 @@ testing::AssertionResult is_equal(const expu::darray<Type, Alloc>& arr, InputIt 
 }
 
 template<class Type, class Alloc>
-testing::AssertionResult is_darray_valid(const expu::darray<Type, expu::checked_allocator<Alloc>>& darray)
+testing::AssertionResult is_darray_valid(const expu::darray<Type, expu::checked_allocator<Alloc, true>>& darray)
 {
     if (darray.capacity() < darray.size())
         return testing::AssertionFailure() 
@@ -68,7 +68,7 @@ testing::AssertionResult is_darray_valid(const expu::darray<Type, expu::checked_
 //Todo: Make general for container types if needed
 template<class Type, class Alloc, class Callable, class ... Args>
 testing::AssertionResult provides_weak_guarantee(
-    expu::darray<Type, expu::checked_allocator<Alloc>>& darray, Callable&& function, Args&& ... args) 
+    expu::darray<Type, expu::checked_allocator<Alloc, true>>& darray, Callable&& function, Args&& ... args) 
 {
     try {
         std::invoke(std::forward<Callable>(function), darray, std::forward<Args>(args)...);
@@ -94,7 +94,7 @@ testing::AssertionResult _verify_unchanged(const ArrayType& arr, const InputIt o
 
 template<class Type, class Alloc, class Callable, class ... Args>
 testing::AssertionResult provides_strong_guarantee(
-    expu::darray<Type, expu::checked_allocator<Alloc>>& darray, Callable&& function, Args&& ... args)
+    expu::darray<Type, expu::checked_allocator<Alloc, true>>& darray, Callable&& function, Args&& ... args)
 {
     EXPU_NO_THROW_ON(Type, const expu::fixed_array<Type> original_data(darray.begin(), darray.end()));
 
@@ -288,7 +288,7 @@ TYPED_TEST(darray_trivially_destructible_tests, move_construct_with_defaulted_al
 TYPED_TEST(darray_trivial_tests, move_construct_with_comp_false_allocator)
 {
     using alloc_type  = expu::test_allocator<TestFixture::value_type, expu::test_alloc_props::always_comp_false>;
-    using darray_type = expu::darray<TestFixture::value_type, expu::checked_allocator<alloc_type>>;
+    using darray_type = expu::darray<TestFixture::value_type, expu::checked_allocator<alloc_type, true>>;
 
     const expu::seq_iter first(0), last(10000);
 

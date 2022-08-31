@@ -112,7 +112,7 @@ namespace expu {
         Type2 _second;
     };
 
-    template<class Alloc>
+    template<class Alloc, bool>
     class _checked_allocator;
 
     //Note: Takes advantage of polymorphism and CTAD to check whether
