@@ -51,18 +51,16 @@ namespace expu {
         template<class ... Args>
         requires(std::is_constructible_v<Allocator, Args...>)
         constexpr _checked_allocator(Args&& ... args) :
-            Allocator(std::forward<Args>(args)...), _allocated_memory(), _is_view(false) {}
+            Allocator(std::forward<Args>(args)...), 
+            _allocated_memory(std::make_shared<_map_type>()) {}
 
         constexpr _checked_allocator(const _checked_allocator& other) noexcept:
             Allocator(other), 
-            _allocated_memory(other._allocated_memory), 
-            _is_view(!other._allocated_memory.empty()) {}
+            _allocated_memory(other._allocated_memory) {}
 
         constexpr _checked_allocator(_checked_allocator&& other) noexcept:
-            Allocator(std::move(other)), _allocated_memory(std::move(other._allocated_memory)), _is_view(false)
-        {
-            other._allocated_memory.clear();
-        }
+            Allocator(std::move(other)), 
+            _allocated_memory(std::move(other._allocated_memory)) {}
 
         constexpr ~_checked_allocator() noexcept
         {
@@ -72,24 +70,14 @@ namespace expu {
     private:
         constexpr void _check_cleared() const noexcept
         {
-            EXPU_VERIFY(!_allocated_memory.size() || _is_view, "Not all memory allocated has been deallocated!");
-        }
-
-        constexpr void _view_check() const
-        {
-            if (_is_view) 
-                throw std::exception("Copied checked_allocator can only be used to access getters!");
-        }
-
-        constexpr void _view_check_no_throw() const noexcept
-        {
-            EXPU_VERIFY(!_is_view, "Copied checked_allocator can only be used to access getters!");
+            //Ensure this is not a moved_from object
+            if(_allocated_memory)
+                EXPU_VERIFY(!(_allocated_memory->size() && _allocated_memory.use_count() == 1), "Not all memory allocated has been deallocated!");
         }
 
     public:
         constexpr _checked_allocator& operator=(const _checked_allocator& other) noexcept
         {
-            _view_check_no_throw();
             Allocator::operator=(other);
 
             //If allocators don't compare equal, then memory cannot be deallocated, hence require that everything is
@@ -104,7 +92,6 @@ namespace expu {
 
         constexpr _checked_allocator& operator=(_checked_allocator&& other) noexcept
         {
-            _view_check_no_throw();
             Allocator::operator=(std::move(other));
 
             if constexpr (!is_always_equal::value) {
@@ -125,21 +112,19 @@ namespace expu {
     public:
         [[nodiscard]] constexpr pointer allocate(const size_type n, const_void_pointer hint = nullptr)
         {
-            _view_check();
             pointer result = _alloc_traits::allocate(*this, n, hint);
             //Add memory block 
-            _allocated_memory.try_emplace(std::to_address(result), _byte_size(n), false);
+            _allocated_memory->try_emplace(std::to_address(result), _byte_size(n), false);
             return result;
         }
 
         constexpr void deallocate(const pointer pointer, const size_type n) noexcept
         {
-            _view_check_no_throw();
             _alloc_traits::deallocate(*this, pointer, n);
 
-            auto loc = _allocated_memory.find(std::to_address(pointer));
+            auto loc = _allocated_memory->find(std::to_address(pointer));
 
-            EXPU_VERIFY(loc != _allocated_memory.end(), "Trying to deallocated memory which has not been allocated!");
+            EXPU_VERIFY(loc != _allocated_memory->end(), "Trying to deallocated memory which has not been allocated!");
 
             _init_memory_container& initialised = loc->second;
 
@@ -150,19 +135,19 @@ namespace expu {
                     EXPU_VERIFY(!initialised_element, "Trying to deallocate memory wherein objects have not been destroyed!");
             }
 
-            _allocated_memory.erase(loc);
+            _allocated_memory->erase(loc);
         }
 
     private:
         [[nodiscard]] constexpr _map_type::iterator _mem_first(const void* const xp)
         {
-            auto loc = _allocated_memory.lower_bound(xp);
+            auto loc = _allocated_memory->lower_bound(xp);
 
-            if (loc != _allocated_memory.end())
+            if (loc != _allocated_memory->end())
                 if (loc->first == xp)
                     return loc;
 
-            if (_allocated_memory.size())
+            if (_allocated_memory->size())
                 return --loc;
             else
                 return loc;
@@ -212,11 +197,10 @@ namespace expu {
         template<class Type, class ... Args>
         constexpr void construct(Type* const xp, Args&& ... args)
         {
-            _view_check();
             _alloc_traits::construct(*this, xp, std::forward<Args>(args)...);
 
             const _map_type::iterator loc = _mem_first(xp);
-            if (loc != _allocated_memory.end()) {
+            if (loc != _allocated_memory->end()) {
                 _init_memory_container& initialised = loc->second;
 
                 const size_t at = _get_offset(loc->first, xp);
@@ -239,11 +223,10 @@ namespace expu {
         template<class Type>
         constexpr void destroy(Type* const xp)
         {
-            _view_check();
             _alloc_traits::destroy(*this, xp);
 
             const _map_type::iterator loc = _mem_first(xp);
-            if (loc != _allocated_memory.end()) {
+            if (loc != _allocated_memory->end()) {
                 _init_memory_container& initialised = loc->second;
 
                 const size_t at = _get_offset(loc->first, xp);
@@ -266,7 +249,6 @@ namespace expu {
 
         constexpr _checked_allocator select_on_container_copy_construction() const
         {
-            _view_check();
             return _alloc_traits::select_on_container_copy_construction(*this);
         }
 
@@ -311,8 +293,6 @@ namespace expu {
         template<class Type>
         constexpr void _mark_initialised(Type* const first, Type* const last, bool value) 
         {
-            _view_check();
-
             const _map_type::iterator loc = _mem_first(first);
             _init_memory_container& initialised = loc->second;
 
@@ -332,9 +312,7 @@ namespace expu {
         }
 
     private:
-        _map_type _allocated_memory;
-        ///Denotes that checked_allocator is for viewing purposes only. Occurs when copying from non-empty allocator. 
-        bool _is_view;
+        std::shared_ptr<_map_type> _allocated_memory;
     };
 
 #if EXPU_CHECKED_ALLOCATOR_LEVEL > 0
