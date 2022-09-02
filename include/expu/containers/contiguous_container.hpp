@@ -354,7 +354,7 @@ namespace expu {
         constexpr _ctg_bool_const_iterator(BoolRangePair::pointer ptr, const BoolRangePair* data) :
             _index(ptr, 0) { (void)data; }
 
-        constexpr _ctg_bool_const_iterator(BoolRangePair::pointer ptr, unsigned char index, const BoolRangePair* data):
+        constexpr _ctg_bool_const_iterator(BoolRangePair::pointer ptr, uint8_t index, const BoolRangePair* data):
             _index(ptr, index) { (void)data; }
 
     public:

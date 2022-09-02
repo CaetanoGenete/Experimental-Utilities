@@ -3,7 +3,7 @@
 
 #include <type_traits>
 #include <exception>
-#include <iostream>
+#include <iostream> //For access to std::cout
 
 namespace expu {
 #define EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD_IF_false
@@ -15,7 +15,6 @@ namespace expu {
     template<class OtherFundamentalType>                                                                                            \
     constexpr friend auto operator symbol(const fundamental_wrapper& lhs, const fundamental_wrapper<OtherFundamentalType>& rhs)     \
         EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD_IF_##requires_integral                                                                 \
-                                                                                                                                    \
     {                                                                                                                               \
         auto result = lhs.unwrapped symbol rhs.unwrapped;                                                                           \
         return fundamental_wrapper<std::decay_t<decltype(result)>>(result);                                                         \
@@ -41,46 +40,34 @@ namespace expu {
             unwrapped(fundamental) {}
 
     public: //Binary arithmetic operator overloads
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(+, false);
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(-, false);
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(*, false);
+        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(+ , false);
+        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(- , false);
+        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(* , false);
         EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(/ , false);
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(%, true);
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(&, true);
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(^, true);
+        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(% , true);
+        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(& , true);
+        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(^ , true);
         EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(| , true);
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(>> , true);
-        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(<< , true);
+        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(>>, true);
+        EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD(<<, true);
 
 #undef EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD_IF_false
 #undef EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD_IF_true
 #undef EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD
 
-    public:
+    public: //Comparison functions, Note: cannot default because comparing with potentially difference template arguments. 
         template<class OtherFundamentalType>
-        constexpr bool operator==(const fundamental_wrapper<OtherFundamentalType>& other) const noexcept
+        constexpr friend bool operator==(const fundamental_wrapper<FundamentalType>& lhs, const fundamental_wrapper<OtherFundamentalType>& rhs) 
+            noexcept
         {
-            return unwrapped == other.unwrapped;
+            return lhs.unwrapped == rhs.unwrapped;
         }
 
         template<class OtherFundamentalType>
-            requires std::is_fundamental_v<OtherFundamentalType>
-        constexpr bool operator==(OtherFundamentalType other) const noexcept
+        constexpr friend auto operator<=>(const fundamental_wrapper<FundamentalType>& lhs, const fundamental_wrapper<OtherFundamentalType>& rhs)
+            noexcept
         {
-            return unwrapped == other;
-        }
-
-        template<class OtherFundamentalType>
-        constexpr auto operator<=>(const fundamental_wrapper<OtherFundamentalType>& other) const noexcept
-        {
-            return unwrapped <=> other.unwrapped;
-        }
-
-        template<class OtherFundamentalType>
-            requires std::is_fundamental_v<OtherFundamentalType>
-        constexpr auto operator<=>(OtherFundamentalType other) const noexcept
-        {
-            return unwrapped <=> other;
+            return lhs.unwrapped <=> rhs.unwrapped;
         }
 
     public:
@@ -245,11 +232,23 @@ namespace expu {
         constexpr test_type& operator=(const test_type&) = default;
         constexpr test_type& operator=(test_type&&)      = default;
 
-
     public:
         //Explicitely defining an empty destructor here to set trivially_destructible to false.
         constexpr ~test_type() noexcept(std::is_nothrow_destructible_v<Base>) {}
     };
+
+    template<class TestType, test_type_props ... new_properties>
+    struct add_property;
+
+    template<class Base, test_type_props ... properties, test_type_props ... new_properties>
+    struct add_property<test_type<Base, properties...>, new_properties...>
+    {
+        //Todo: Add checks to ensure no properties are duplicated!
+        using type = test_type<Base, properties..., new_properties...>;
+    };
+
+    template<class TestType, test_type_props ... new_properties>
+    using add_property_t = typename add_property<TestType, new_properties...>::type;
 }
 
 /*

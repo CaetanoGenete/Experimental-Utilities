@@ -144,10 +144,11 @@ namespace expu
             try {
                 if constexpr (_stores_bool) {
                     //Cast to char* here to ensure that underlying data of bool is correctly set. Todo: Create fill_n function that supports checked_allocator
-                    std::fill_n(reinterpret_cast<uint8_t*>(std::to_address(new_first)), alloc_size, elem ? (uint8_t)0xFF : (uint8_t)0);
+                    auto as_uint8 = reinterpret_cast<uint8_t*>(std::to_address(new_first));
+                    auto new_last = std::fill_n(as_uint8, alloc_size, static_cast<uint8_t>(elem ? 0xFF : 0));
 
                     //Hack: Temporarily added support for checked allocator.
-                    _mark_initialised_if_checked_allocator(_alloc(), new_first, alloc_size, true);
+                    _mark_initialised_if_checked_allocator(_alloc(), new_first, new_last, true);
                     _data().size = n;
                 }
                 else
@@ -223,20 +224,20 @@ namespace expu
         }
 
         template<
-            std::forward_iterator InputIt,
-            std::sentinel_for<InputIt> Sentinel>
-        constexpr void _unallocated_assign(const InputIt begin, const Sentinel end, size_type _bool_size = 0)
+            std::forward_iterator FwdIt,
+            std::sentinel_for<FwdIt> Sentinel>
+        constexpr void _unallocated_assign(const FwdIt begin, const Sentinel end, const size_type bool_size = 0)
         {
             const auto range_size = static_cast<size_type>(std::ranges::distance(begin, end));
 
             pointer new_last = _ctg_duplicate(_alloc(), begin, end, _first(), range_size);
-            _set_sentinel(new_last, _bool_size);
+            _set_sentinel(new_last, bool_size);
         }
 
         template<
             std::forward_iterator FwdIt,
             std::sentinel_for<FwdIt> Sentinel>
-        constexpr void _alt_alloc_assign(Alloc& alt_alloc, FwdIt first, const Sentinel last, size_type _bool_size = 0)
+        constexpr void _alt_alloc_assign(Alloc& alt_alloc, const FwdIt first, const Sentinel last, const size_type bool_size = 0)
         {
             const auto range_size = static_cast<size_type>(std::ranges::distance(first, last));
 
@@ -244,7 +245,7 @@ namespace expu
                 pointer new_first = nullptr;
                 pointer new_last  = _ctg_duplicate(alt_alloc, first, last, new_first, range_size);
 
-                _replace(new_first, new_last, _bool_size);
+                _replace(new_first, new_last, bool_size);
             }
             else
                 copy(first, last, _first());
@@ -315,6 +316,17 @@ namespace expu
             return *this;
         }
 
+    private:
+        constexpr reference _index_operator(const size_type index) const noexcept
+        {
+            EXPU_L1_ITER_VERIFY(index < size(), "heap_array index out of bounds!");
+
+            if constexpr (_stores_bool)
+                return _bool_index(std::to_address(_first()) + (index >> 3), index & 7);
+            else
+                return _first()[index];
+        }
+
     public:
         constexpr const_reference at(const size_type index) const 
         {
@@ -329,20 +341,8 @@ namespace expu
                 throw std::out_of_range("heap_array index out of bounds!");
         }
 
-        constexpr const_reference operator[](const size_type index) const
-        {
-            //Note: safe to do, non-const version of expu::fixed_array::operator[] is inheritely const
-            return static_cast<const_reference>(const_cast<fixed_array&>(*this).operator[](index));
-        }
-        constexpr reference operator[](const size_type index)
-        {
-            EXPU_L1_ITER_VERIFY(index < size(), "heap_array index out of bounds!");
-
-            if constexpr (_stores_bool)
-                return _bool_index(std::to_address(_first()) + (index >> 3), index & 7);
-            else
-                return _first()[index];
-        }
+        constexpr const_reference operator[](const size_type index) const noexcept { return _index_operator(index); }
+        constexpr reference       operator[](const size_type index)       noexcept { return _index_operator(index); }
 
     private:
         constexpr size_type _size() const noexcept 
@@ -362,16 +362,12 @@ namespace expu
                 return _size();
         }
 
-    public: //Range getters
-        [[nodiscard]] constexpr iterator begin()              noexcept { return iterator(_first(), &_data()); }
-        [[nodiscard]] constexpr const_iterator cbegin() const noexcept { return const_iterator(_first(), &_data()); }
-        [[nodiscard]] constexpr const_iterator begin()  const noexcept { return cbegin(); }
-
-        [[nodiscard]] constexpr iterator end() noexcept 
+    private: //Helper range getter functions
+        [[nodiscard]] constexpr iterator _end() const noexcept
         {
             if constexpr (_stores_bool) {
                 //Check to see if at boundary
-                unsigned char remainder = size() & 7;
+                uint8_t remainder = size() & 7;
                 if (remainder != 0)
                     return iterator(_first() + (size() >> 3), remainder, &_data());
             }
@@ -379,11 +375,17 @@ namespace expu
             return iterator(_last(), &_data());
         }
 
-        [[nodiscard]] constexpr const_iterator cend() const noexcept { return const_cast<fixed_array&>(*this).end(); }
+    public: //Range getters
+        [[nodiscard]] constexpr iterator begin()              noexcept { return iterator(_first(), &_data()); }
+        [[nodiscard]] constexpr const_iterator cbegin() const noexcept { return const_iterator(_first(), &_data()); }
+        [[nodiscard]] constexpr const_iterator begin()  const noexcept { return cbegin(); }
+
+        [[nodiscard]] constexpr iterator end()              noexcept { return _end(); }
+        [[nodiscard]] constexpr const_iterator cend() const noexcept { return _end(); }
         [[nodiscard]] constexpr const_iterator end()  const noexcept { return cend(); }
 
 
-    private: //Useful getters
+    private: //private member getters
         constexpr const allocator_type& _alloc() const noexcept 
         { 
             return _cpair.first(); 

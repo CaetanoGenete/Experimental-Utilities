@@ -33,6 +33,9 @@ namespace expu {
     concept base_of = std::is_base_of_v<Base, Derived>;
 
 
+    //////////////ALLOCATOR HELPERS///////////////////////////////////////////////////////////////
+
+
     template<class Alloc>
     using _alloc_value_t = typename std::allocator_traits<Alloc>::value_type;
 
@@ -72,66 +75,48 @@ namespace expu {
     using make_index_sequence_from = typename _shift_sequence_by<from, std::make_index_sequence<to - from>>::type;
 
 
+    //////////////MISCLELLANEOUS///////////////////////////////////////////////////////////////
+
+
+    //Note: Heavily heavily inspired from equivalent dinkleware object.
+    class _not_quite_object {
+    public:
+
+        struct construct_tag {
+            explicit construct_tag() = default;
+        };
+
+        _not_quite_object() = delete;
+
+        constexpr explicit _not_quite_object(construct_tag) noexcept {}
+
+        _not_quite_object(const _not_quite_object&) = delete;
+        _not_quite_object& operator=(const _not_quite_object&) = delete;
+
+        void operator&() const = delete;
+
+    protected:
+        ~_not_quite_object() = default;
+    };
+
+
+    //////////////MISCLELLANEOUS///////////////////////////////////////////////////////////////
+
+
+    template<class Type>
+    struct unwrap_if_enum { using type = Type; };
+
+    template<class Type>
+        requires(std::is_enum_v<Type>)
+    struct unwrap_if_enum<Type> { using type = std::underlying_type_t<Type>; };
+
+    template<class Type>
+    using unwrap_if_enum_t = typename unwrap_if_enum<Type>::type;
+
+
     template<class FirstType, class ... Types>
     using first_t = FirstType;
 
-    /*
-    LEGACY: log(n) instantiation depth cartesian product on std::tuple
-
-    template<class ... Tuples>
-    using tuple_concat_t = decltype(std::tuple_cat(std::declval<Tuples>()...));
-
-    template<class Tuple>
-    struct halve_tuple {
-    private:
-        static constexpr size_t _tuple_size = std::tuple_size_v<Tuple>;
-        static constexpr size_t _half_size  = _tuple_size / 2;
-
-    public:
-        using lhs_type = tuple_subset_t<Tuple, std::make_index_sequence<_half_size>>;
-        using rhs_type = tuple_subset_t<Tuple, make_index_sequence_from<_half_size, _tuple_size>>;
-
-    };
-
-    template<class LhsTuple, class RhsTuple>
-    struct _cartesian_merge;
-
-    template<class ... LhsTypes, class ... RhsTuples>
-    struct _cartesian_merge<order_twople<LhsTypes...>, std::tuple<RhsTuples...>>
-    {
-        using type = std::tuple<tuple_concat_t<std::tuple<LhsTypes...>, RhsTuples>...>;
-    };
-
-    template<class ... LhsTuples, class ... RhsTuples>
-    struct _cartesian_merge<std::tuple<LhsTuples...>, std::tuple<RhsTuples...>>
-    {
-        using type = tuple_concat_t<typename _cartesian_merge<std::tuple<LhsTuples>, std::tuple<RhsTuples...>>::type...>;
-    };
-
-    template<class Tuple>
-    struct _cartesian_product;
-
-    template<class ... Types>
-    struct _cartesian_product<order_twople<Types...>>
-    {
-        using type = std::tuple<std::tuple<Types>...>;
-    };
-
-    template<class ... Tuples>
-    struct _cartesian_product<std::tuple<Tuples...>>
-    {
-    private:
-        using _halved_tuple = halve_tuple<std::tuple<Tuples...>>;
-
-    public:
-        //Divide and conquer
-        using type =
-            typename _cartesian_merge<
-                typename _cartesian_product<typename _halved_tuple::lhs_type>::type,
-                typename _cartesian_product<typename _halved_tuple::rhs_type>::type
-            >::type;
-    };
-    */
 
     template<class Type>
     constexpr decltype(auto) remove_const_cast(Type&& type) noexcept

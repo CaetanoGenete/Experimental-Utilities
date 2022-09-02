@@ -61,16 +61,12 @@ namespace expu {
     protected: //Memory search helper functions
         [[nodiscard]] _map_type::iterator _mem_first_common(const void* const xp) const
         {
-            _map_type::iterator loc = _allocated_memory->lower_bound(xp);
+            _map_type::iterator loc = _allocated_memory->upper_bound(xp);
 
-            if (loc != _allocated_memory->end())
-                if (loc->first == xp)
-                    return loc;
-
-            if (_allocated_memory->size())
-                return --loc;
-            else
+            if (_allocated_memory->empty())
                 return loc;
+            else
+                return --loc;
         }
 
         [[nodiscard]] _map_type::const_iterator _mem_first(const void* const xp) const { return _mem_first_common(xp); }
@@ -189,7 +185,6 @@ namespace expu {
                 return false;
         }
 
-
     private: //Size helper functions
         [[nodiscard]] constexpr size_t _byte_size(const size_type n) const noexcept
         {
@@ -287,48 +282,52 @@ namespace expu {
         [[nodiscard]] bool initialised(const const_pointer first, const const_pointer last) const
         {
             const _map_type::const_iterator loc = _mem_first(std::to_address(first));
-            const _init_memory_container& initialised = loc->second.initialised;
 
-                  size_t at_first = _get_offset(loc->first, std::to_address(first));
-            const size_t at_end   = _get_offset(loc->first, std::to_address(last));
+            if (loc != _allocated_memory->end()) {
+                const _init_memory_container& initialised = loc->second.initialised;
 
-            if (at_end <= initialised.size()) {
-                for (;at_first != at_end; ++at_first)
-                    if (!initialised[at_first]) return false;
+                size_t at_first = _get_offset(loc->first, std::to_address(first));
+                const size_t at_end = _get_offset(loc->first, std::to_address(last));
+
+                if (at_end <= initialised.size()) {
+                    for (; at_first != at_end; ++at_first)
+                        if (!initialised[at_first]) return false;
+
+                    return true;
+                }
             }
-            else
-                throw std::out_of_range("Some or all of the objects being checked are not within memory allocated by allocator.");
 
-            return true;
+            throw std::out_of_range("Some or all of the objects being checked are not within memory allocated by allocator.");
         }
 
         [[nodiscard]] bool atleast_one_initiliased_in(const const_pointer first, const const_pointer last) const
         {
             const _map_type::const_iterator loc = _mem_first(std::to_address(first));
-            const _init_memory_container& initialised = loc->second.initialised;
+            if (loc != _allocated_memory->end()) {
+                const _init_memory_container& initialised = loc->second.initialised;
 
-                  size_t at_first = _get_offset(loc->first, std::to_address(first));
-            const size_t at_end   = _get_offset(loc->first, std::to_address(last));
+                size_t at_first = _get_offset(loc->first, std::to_address(first));
+                const size_t at_end = _get_offset(loc->first, std::to_address(last));
 
-            if (at_end <= initialised.size()) {
-                for (; at_first != at_end; ++at_first)
-                    if (initialised[at_first]) return true;
+                if (at_end <= initialised.size()) {
+                    for (; at_first != at_end; ++at_first)
+                        if (initialised[at_first]) return true;
+
+                    return false;
+                }
             }
-            else
-                throw std::out_of_range("Some or all of the objects being checked are not within memory allocated by allocator.");
-
-            return false;
+            
+            throw std::out_of_range("Some or all of the objects being checked are not within memory allocated by allocator.");
         }
 
     public:
-        template<class Type>
-        void _mark_initialised(Type* const first, Type* const last, bool value) 
+        void _mark_initialised(const void* const first, const void* const last, bool value)
         {
             const _map_type::iterator loc = _mem_first(first);
             _init_memory_container& initialised = loc->second.initialised;
 
-                  size_t at_first = _get_offset(loc->first, std::to_address(first));
-            const size_t at_end   = _get_offset(loc->first, std::to_address(last));
+                  size_t at_first = _get_offset(loc->first, first);
+            const size_t at_end   = _get_offset(loc->first, last);
 
             if (at_end <= initialised.size()) {
                 for (; at_first != at_end; ++at_first) {

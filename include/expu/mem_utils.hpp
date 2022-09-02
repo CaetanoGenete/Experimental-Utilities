@@ -14,6 +14,10 @@ namespace expu {
     struct zero_then_variadic{};
     struct one_then_variadic{};
 
+    
+    //////////////////////////////////////COMPRESSED PAIR ///////////////////////////////////////////////////////////////////////////////
+
+
     template<class Type1, class Type2, bool = std::is_empty_v<Type1>>
     class compressed_pair final
     {
@@ -112,11 +116,17 @@ namespace expu {
         Type2 _second;
     };
 
+
+    //////////////////////////////////////CHECKED ALLOCATOR HELPER FUNCTIONS///////////////////////////////////////////////////////////////////////////////
+
+
     template<class Alloc, bool>
     class _checked_allocator;
 
     //Note: Takes advantage of polymorphism and CTAD to check whether
-    //Alloc inherits from some template of checked_allocator.
+    //Alloc inherits from some template of checked_allocator. Works
+    //because _checked_allocator has a copy constructor defined for
+    //all template arguments.
     template<class Alloc>
     concept _uses_checked_allocator = requires(Alloc & alloc) {
         { _checked_allocator(alloc) } -> expu::base_of<Alloc>;
@@ -124,44 +134,36 @@ namespace expu {
 
 
     template<class Alloc>
-    constexpr void _mark_initialised_if_checked_allocator(Alloc& alloc, _alloc_value_t<Alloc>* first, _alloc_size_t<Alloc> size, bool value)
+    constexpr void _mark_initialised_if_checked_allocator(Alloc& alloc, const void* const first, const void* const last, bool value)
         noexcept
     {
-        (void)alloc; (void)first; (void)size; (void)value;
+        (void)alloc; (void)first; (void)last; (void)value;
     }
 
     template<_uses_checked_allocator Alloc>
-    constexpr void _mark_initialised_if_checked_allocator(Alloc& alloc, _alloc_value_t<Alloc>* first, _alloc_size_t<Alloc> size, bool value)
+    constexpr void _mark_initialised_if_checked_allocator(Alloc& alloc, void* const first, const void* const last, bool value)
     {
-        alloc._mark_initialised(first, first + size, value);
+        alloc._mark_initialised(first, last, value);
     }
 
-    template<class Alloc>
-    constexpr void destroy_range(Alloc& alloc, _alloc_value_t<Alloc>* first, _alloc_value_t<Alloc>* last)
-        noexcept(std::is_trivially_destructible_v<_alloc_value_t<Alloc>>)
-    {
-        if constexpr (!std::is_trivially_destructible_v<_alloc_value_t<Alloc>>) {
-            for (; first != last; ++first)
-                std::allocator_traits<Alloc>::destroy(alloc, first);
-        }
-        else
-            _mark_initialised_if_checked_allocator(alloc, first, last - first, false);
-    }
 
-    template<class Alloc>
-    requires(!std::same_as<_alloc_ptr_t<Alloc>, _alloc_value_t<Alloc>*>)
+    //////////////////////////////////////HELPER EXPECTION HANDLING FUNCTIONS//////////////////////////////////////////////////////////////////
+
+
+    template<class Alloc, class Type> 
+    constexpr void destroy_range(Alloc& alloc, Type* first, Type* last)
+        noexcept(std::is_trivially_destructible_v<Type>);
+
+    template<class Alloc> 
     constexpr void destroy_range(Alloc& alloc, const _alloc_ptr_t<Alloc> first, const _alloc_ptr_t<Alloc> last)
-        noexcept(std::is_trivially_destructible_v<_alloc_value_t<Alloc>>)
-    {
-        return destroy_range(alloc, std::to_address(first), std::to_address(last));
-    }
+        noexcept(std::is_trivially_destructible_v<_alloc_value_t<Alloc>>);
 
-    template<class Alloc>
+    template<class Alloc, class Type>
     struct _partial_range 
     {
     public:
         using value_type = _alloc_value_t<Alloc>;
-        using pointer    = value_type*;
+        using pointer    = Type*;
 
     private:
         pointer _first, _last;
@@ -192,12 +194,12 @@ namespace expu {
         }
     };
 
-    template<class Alloc>
+    template<class Alloc, class Type>
     struct _partial_backward_range
     {
     public:
         using value_type = _alloc_value_t<Alloc>;
-        using pointer    = value_type*;
+        using pointer    = Type*;
 
     private:
         pointer _first, _last;
@@ -227,31 +229,76 @@ namespace expu {
         }
     };
 
+    /////////////////////////////////////WRAPPED ITERATOR HELPERS///////////////////////////////////////////////////////////////////
+
+
+    template<class Type>
+    constexpr auto _unwrapped(const Type type)
+        noexcept(std::is_copy_constructible_v<Type>)
+    {
+        return type; //By default, do nothing.
+    }
+
+    template<class Iter>
+    constexpr auto _unwrapped(const std::move_iterator<Iter> move_iter)
+        noexcept(noexcept(move_iter.base()))
+    {
+        return move_iter.base();
+    }
+
+    template<class Sentinel>
+    constexpr auto _unwrapped(const std::move_sentinel<Sentinel> move_sentinel)
+        noexcept(noexcept(move_sentinel.base()))
+    {
+        return move_sentinel.base();
+    }
+
+
+    template<class Type>
+    using _unwrapped_t = decltype(_unwrapped(std::declval<Type>()));
+
+    template<class Iter>
+    concept _ctg_or_ctg_move_iter = std::contiguous_iterator<_unwrapped_t<Iter>>;
+
+
+    template<class Sentinel>
+    constexpr auto _make_move_sentinel(const Sentinel sentinel)
+        noexcept(std::is_nothrow_move_constructible_v<Sentinel>)
+    {
+        return std::move_sentinel(std::move(sentinel));
+    }
+
+    template<class Iter>
+    constexpr auto _make_move_sentinel(const std::move_iterator<Iter> move_iter)
+        noexcept(std::is_nothrow_copy_constructible_v<Iter>)
+    {
+        return move_iter; //Do nothing if move iterator, to avoid unnecessary wrapping
+    }
+
 
     /////////////////////////////////////RANGEIFIED C-FUNCTIONS///////////////////////////////////////////////////////////////////
 
 
-    template<class Type>
-    struct _unwrap_if_enum { using type = Type; };
+    template<class Alloc, class Type>
+    constexpr void destroy_range(Alloc& alloc, Type* first, Type* last)
+        noexcept(std::is_trivially_destructible_v<Type>)
+    {
+        if constexpr (!std::is_trivially_destructible_v<Type>) {
+            for (; first != last; ++first)
+                std::allocator_traits<Alloc>::destroy(alloc, first);
+        }
+        else
+            _mark_initialised_if_checked_allocator(alloc, first, last, false);
+    }
 
-    template<class Type>
-    requires(std::is_enum_v<Type>)
-    struct _unwrap_if_enum<Type> { using type = std::underlying_type_t<Type>; };
-    
-    template<class Type>
-    using _unwrap_if_enum_t = typename _unwrap_if_enum<Type>::type;
+    template<class Alloc>
+    requires(!std::is_pointer_v<_alloc_ptr_t<Alloc>>)
+    constexpr void destroy_range(Alloc& alloc, const _alloc_ptr_t<Alloc> first, const _alloc_ptr_t<Alloc> last)
+        noexcept(std::is_trivially_destructible_v<_alloc_value_t<Alloc>>)
+    {
+        return destroy_range(alloc, std::to_address(first), std::to_address(last));
+    }
 
-    template<class Iter>
-    constexpr bool _is_ctg_move_iter = false;
-
-    template<class Iter>
-    constexpr bool _is_ctg_move_iter<std::move_iterator<Iter>> = std::contiguous_iterator<Iter>;
-
-    template<class Iter>
-    concept _ctg_or_ctg_move_iter = _is_ctg_move_iter<Iter> || std::contiguous_iterator<Iter>;
-
-    template<std::input_or_output_iterator Iter, std::sentinel_for<Iter> Sentinel>
-    constexpr bool _is_ctg_sized_range = _ctg_or_ctg_move_iter<Iter> && std::sized_sentinel_for<Sentinel, Iter>;
 
     template<
         std::input_or_output_iterator SrcIter,
@@ -260,8 +307,8 @@ namespace expu {
     struct _actually_trivially
     {
     private:
-        using _src_type  = _unwrap_if_enum_t<std::iter_value_t<SrcIter>>;
-        using _dest_type = _unwrap_if_enum_t<std::iter_value_t<DestIter>>;
+        using _src_type  = unwrap_if_enum_t<std::iter_value_t<SrcIter>>;
+        using _dest_type = unwrap_if_enum_t<std::iter_value_t<DestIter>>;
         
         //Todo: Add support for aggregate types as much as possible
         //Types are compatible iff they are either:
@@ -277,9 +324,10 @@ namespace expu {
 
         //Note: mem-x functions can only be used with trivially_constructible types and contiguous iterators
         static constexpr bool _potentially_trivial =
-            std::is_trivially_copyable_v<_src_type>   &&
-            _is_ctg_sized_range<SrcIter, SrcSentinel> &&
-            std::contiguous_iterator<DestIter>        &&
+            std::is_trivially_copyable_v<_src_type>         &&
+            std::contiguous_iterator<_unwrapped_t<SrcIter>> &&
+            std::sized_sentinel_for<SrcSentinel, SrcIter>   &&
+            std::contiguous_iterator<DestIter>              &&
             _compatible;
 
     public:
@@ -296,8 +344,9 @@ namespace expu {
                 std::iter_reference_t<SrcIter>>;
     };
 
+
     template<bool not_overlapping>
-    void* _memcpy_or_memmove(void* dest, const void* src, size_t size) 
+    void* _memcpy_or_memmove(void* dest, const void* src, size_t size) noexcept
     {
         if constexpr (not_overlapping)
             return std::memcpy(dest, src, size);
@@ -305,113 +354,64 @@ namespace expu {
             return std::memmove(dest, src, size);
     }
 
-    //Todo: Consider adding optimisation in the case where SrcSizedSentinel is a contiguous iterator or do away with sized_sentinel (if found to not be needed)
-    template<
-        bool not_overlapping,
-        std::contiguous_iterator SrcCtgIt,
-        std::sized_sentinel_for<SrcCtgIt> SrcSizedSentinel,
-        std::contiguous_iterator DestCtgIt>
-    DestCtgIt _range_memcpy_or_memmove(SrcCtgIt first, SrcSizedSentinel last, DestCtgIt output)
+    template<bool not_overlapping>
+    struct _range_memcpy_or_memmove : private _not_quite_object
     {
-        auto output_chr = const_cast<char*>(reinterpret_cast<const volatile char*>(std::to_address(output)));
+        using _not_quite_object::_not_quite_object;
 
-        size_t count = static_cast<size_t>(last - first);
-        size_t size  = count * sizeof(std::iter_value_t<SrcCtgIt>);
+        template<
+            std::contiguous_iterator SrcCtgIt,
+            std::sized_sentinel_for<SrcCtgIt> SrcSizedSentinel,
+            std::contiguous_iterator DestCtgIt>
+        DestCtgIt operator()(SrcCtgIt first, SrcSizedSentinel last, DestCtgIt output) const noexcept
+        {
+            auto output_chr = const_cast<char*>(reinterpret_cast<const volatile char*>(std::to_address(output)));
 
-        _memcpy_or_memmove<not_overlapping>(output_chr, std::to_address(first), size);
-        return output + count;
-    }
+            size_t count = static_cast<size_t>(last - first);
+            size_t size = count * sizeof(std::iter_value_t<SrcCtgIt>);
 
-    template<class Type>
-    constexpr bool _is_move_wrapper = is_template_of_v<Type, std::move_iterator> || 
-                                      is_template_of_v<Type, std::move_sentinel>;
+            _memcpy_or_memmove<not_overlapping>(output_chr, std::to_address(first), size);
+            return output + count;
+        }
+    };     
 
-    template<
-        bool not_overlapping,
-        std::contiguous_iterator SrcCtgIt,
-        std::sized_sentinel_for<std::move_iterator<SrcCtgIt>> SrcSizedSentinel,
-        std::contiguous_iterator DestCtgIt>
-    DestCtgIt _range_memcpy_or_memmove(std::move_iterator<SrcCtgIt> first, SrcSizedSentinel last, DestCtgIt output)
+    inline constexpr _range_memcpy_or_memmove<true>  _range_memcpy {_not_quite_object::construct_tag{}};
+    inline constexpr _range_memcpy_or_memmove<false> _range_memmove{_not_quite_object::construct_tag{}};
+
+
+    template<bool not_overlapping>
+    struct _range_backward_memcpy_or_memmove : private _not_quite_object
     {
-        if constexpr (_is_move_wrapper<SrcSizedSentinel>)
-            return _range_memcpy_or_memmove<not_overlapping>(first.base(), last.base(), output);
-        else
-            return _range_memcpy_or_memmove<not_overlapping>(first.base(), last, output);
-    }
+        using _not_quite_object::_not_quite_object;
 
-    template<
-        _ctg_or_ctg_move_iter SrcCtgIt,
-        std::sized_sentinel_for<SrcCtgIt> SizedSentinel,
-        std::contiguous_iterator DestCtgIt>
-    DestCtgIt _range_memcpy(SrcCtgIt first, SizedSentinel last, DestCtgIt output)
-    {
-        return _range_memcpy_or_memmove<true>(first, last, output);
-    }
+        template<
+            std::contiguous_iterator SrcCtgIt,
+            std::sized_sentinel_for<SrcCtgIt> SizedSentinel,
+            std::contiguous_iterator DestCtgIt>
+        DestCtgIt operator()(SizedSentinel first, SrcCtgIt last, DestCtgIt output) const noexcept
+        {
+            char* output_chr = const_cast<char*>(reinterpret_cast<volatile char*>(std::to_address(output)));
 
-    template<
-        _ctg_or_ctg_move_iter SrcCtgIt,
-        std::sized_sentinel_for<SrcCtgIt> SizedSentinel,
-        std::contiguous_iterator DestCtgIt>
-    DestCtgIt _range_memmove(SrcCtgIt first, SizedSentinel last, DestCtgIt output)
-    {
-        return _range_memcpy_or_memmove<false>(first, last, output);
-    }
+            size_t count = static_cast<size_t>(last - first);
+            size_t size = count * sizeof(std::iter_value_t<SrcCtgIt>);
 
-    template<
-        bool not_overlapping,
-        std::contiguous_iterator SrcCtgIt,
-        std::sized_sentinel_for<SrcCtgIt> SizedSentinel,
-        std::contiguous_iterator DestCtgIt>
-    DestCtgIt _range_backward_memcpy_or_memmove(SizedSentinel first, SrcCtgIt last, DestCtgIt output)
-    {
-        char* output_chr = const_cast<char*>(reinterpret_cast<volatile char*>(std::to_address(output)));
+            //No need to calculate address of first range element. 
+            if constexpr (std::contiguous_iterator<SizedSentinel>)
+                _memcpy_or_memmove<not_overlapping>(output_chr - size, std::to_address(first), size);
+            else
+                _memcpy_or_memmove<not_overlapping>(output_chr - size, std::to_address(last) - count, size);
 
-        size_t count = static_cast<size_t>(last - first);
-        size_t size  = count * sizeof(std::iter_value_t<SrcCtgIt>);
+            return output - count;
+        }
+    };
 
-        if constexpr (std::contiguous_iterator<SizedSentinel>)
-            _memcpy_or_memmove<not_overlapping>(output_chr - size, std::to_address(first), size);
-        else
-            _memcpy_or_memmove<not_overlapping>(output_chr - size, std::to_address(last) - count, size);
+    inline constexpr _range_backward_memcpy_or_memmove<true>  _range_backward_memcpy {_not_quite_object::construct_tag{}};
+    inline constexpr _range_backward_memcpy_or_memmove<false> _range_backward_memmove{_not_quite_object::construct_tag{}};  
 
-        return output - count;
-    }
-
-    template<
-        bool not_overlapping,
-        std::contiguous_iterator SrcCtgIt,
-        std::sized_sentinel_for<std::move_iterator<SrcCtgIt>> SizedSentinel,
-        std::contiguous_iterator OutputCtgIt>
-    OutputCtgIt _range_backward_memcpy_or_memmove(SizedSentinel first, std::move_iterator<SrcCtgIt> last, OutputCtgIt output)
-    {
-        if constexpr (_is_move_wrapper<SizedSentinel>)
-            return _range_backward_memcpy_or_memmove<not_overlapping>(first.base(), last.base(), output);
-        else
-            return _range_backward_memcpy_or_memmove<not_overlapping>(first, last.base(), output);
-    }
-
-    template<
-        std::contiguous_iterator SrcCtgIt,
-        std::sized_sentinel_for<SrcCtgIt> SizedSentinel,
-        std::contiguous_iterator DestCtgIt>
-    DestCtgIt _range_backward_memcpy(SizedSentinel first, SrcCtgIt last, DestCtgIt output) 
-    {
-        return _range_backward_memcpy_or_memmove<true>(first, last, output);
-    }
-
-    template<
-        std::contiguous_iterator SrcCtgIt,
-        std::sized_sentinel_for<SrcCtgIt> SizedSentinel,
-        std::contiguous_iterator DestCtgIt>
-    DestCtgIt _range_backward_memmove(SizedSentinel first, SrcCtgIt last, DestCtgIt output)
-    {
-        return _range_backward_memcpy_or_memmove<false>(first, last, output);
-    }
 
     template<
         std::contiguous_iterator CtgIt,
-        std::sized_sentinel_for<CtgIt> SizedSentinel
-    >
+        std::sized_sentinel_for<CtgIt> SizedSentinel>
     void* set_bits(void* const bits, CtgIt first, const SizedSentinel last)
     {
         const size_t bytes_count = right_shift_round_up(std::ranges::distance(first, last), 3);
@@ -438,11 +438,10 @@ namespace expu {
         class Alloc,
         std::contiguous_iterator CtgIt,
         std::sized_sentinel_for<CtgIt> SizedSentinel> 
-    void* set_bits(Alloc& alloc, _alloc_value_t<Alloc>* const bits, CtgIt first, const SizedSentinel last) 
+    void* set_bits(Alloc& alloc, void* const bits, CtgIt first, const SizedSentinel last)
     {
-        void* result = set_bits(bits, first, last);
-        //Todo: Add proper checks here to see if result is aligned properly
-        _mark_initialised_if_checked_allocator(alloc, std::to_address(first), last - first, true);
+        void* const result = set_bits(bits, first, last);
+        _mark_initialised_if_checked_allocator(alloc, bits, result, true);
 
         return result;
     }
@@ -450,20 +449,22 @@ namespace expu {
 /////////////////////////////////////UNINITIALISED RANGE FUNCTIONS///////////////////////////////////////////////////////////////////
 
     template<
+        class Alloc, 
+        class Type,
         std::input_iterator InputIt,
-        std::sentinel_for<InputIt> Sentinel,
-        class Alloc>
-    constexpr auto uninitialised_copy(Alloc& alloc, InputIt first, Sentinel last, _alloc_value_t<Alloc>* output)
-        noexcept(std::is_nothrow_constructible_v<_alloc_value_t<Alloc>, std::iter_reference_t<InputIt>>)
+        std::sentinel_for<InputIt> Sentinel>
+    constexpr auto uninitialised_copy(Alloc& alloc, InputIt first, Sentinel last, Type* output)
+        noexcept(std::is_nothrow_constructible_v<Type, std::iter_reference_t<InputIt>>)
     {
-        if constexpr (_actually_trivially<InputIt, _alloc_value_t<Alloc>*, Sentinel>::constructible) {
+        if constexpr (_actually_trivially<InputIt, Type*, Sentinel>::constructible) {
             if (!std::is_constant_evaluated()) {
-                _mark_initialised_if_checked_allocator(alloc, output, last - first, true);
-                return _range_memcpy(first, last, output);
+                auto result = _range_memcpy(_unwrapped(first), _unwrapped(last), output);
+                _mark_initialised_if_checked_allocator(alloc, output, result, true);
+                return result;
             }
         }
 
-        _partial_range<Alloc> partial_range(alloc, output);
+        _partial_range<Alloc, Type> partial_range(alloc, output);
         for (; first != last; ++first)
             partial_range.emplace_back(*first);
 
@@ -471,22 +472,22 @@ namespace expu {
     }
 
     template<
+        class Alloc,
+        class Type,
         std::bidirectional_iterator BiDirIt,
-        std::sentinel_for<BiDirIt> Sentinel,
-        class Alloc>
-    constexpr auto uninitialised_backward_copy(Alloc& alloc, Sentinel first, BiDirIt last, _alloc_value_t<Alloc>* output)
-        noexcept(std::is_nothrow_constructible_v<_alloc_value_t<Alloc>, std::iter_reference_t<BiDirIt>>)
+        std::sentinel_for<BiDirIt> Sentinel>
+    constexpr auto uninitialised_backward_copy(Alloc& alloc, Sentinel first, BiDirIt last, Type* output)
+        noexcept(std::is_nothrow_constructible_v<Type, std::iter_reference_t<BiDirIt>>)
     {
-        if constexpr (_actually_trivially<BiDirIt, _alloc_value_t<Alloc>*, Sentinel>::constructible) {
+        if constexpr (_actually_trivially<BiDirIt, Type*, Sentinel>::constructible) {
             if (!std::is_constant_evaluated()) {
-                size_t range_size = static_cast<size_t>(last - first);
-                _mark_initialised_if_checked_allocator(alloc, output - range_size, range_size, true);
-
-                return _range_backward_memcpy(first, last, output);
+                auto result = _range_backward_memcpy(_unwrapped(first), _unwrapped(last), output);
+                _mark_initialised_if_checked_allocator(alloc, result, output, true);
+                return result;
             }
         }
 
-        _partial_backward_range<Alloc> partial_range(alloc, output);
+        _partial_backward_range<Alloc, Type> partial_range(alloc, output);
         while (first != last)
             partial_range.emplace_back(*(--last));
 
@@ -494,27 +495,27 @@ namespace expu {
     }
 
     template<
+        class Alloc,
+        class Type,
         std::input_iterator InputIt,
-        std::sentinel_for<InputIt> Sentinel,
-        class Alloc>
-    constexpr auto uninitialised_move(Alloc& alloc, InputIt first, Sentinel last, _alloc_value_t<Alloc>* output)
-        noexcept(std::is_nothrow_move_constructible_v<std::iter_value_t<InputIt>>)
+        std::sentinel_for<InputIt> Sentinel>
+    constexpr auto uninitialised_move(Alloc& alloc, InputIt first, Sentinel last, Type* output)
+        noexcept(std::is_nothrow_constructible_v<Type, std::iter_reference_t<InputIt>>)
     {
         //Todo: Check performance penalty
         return uninitialised_copy(
             alloc,
             std::make_move_iterator(first),
-            std::move_sentinel(last),
+            _make_move_sentinel(last),
             output);
     }
 
     //Todo: memset for compatible types
-    template<class Type, class Alloc>
-    requires(std::is_constructible_v<_alloc_value_t<Alloc>, Type>)
-    constexpr void uninitialised_fill(Alloc& alloc, _alloc_value_t<Alloc>* first, const _alloc_value_t<Alloc>* const last, const Type& value) 
-        noexcept(std::is_nothrow_constructible_v<_alloc_value_t<Alloc>, Type>)
+    template<class Type, class Alloc, class DestType>
+    constexpr void uninitialised_fill(Alloc& alloc, DestType* first, const DestType* const last, const Type& value)
+        noexcept(std::is_nothrow_constructible_v<DestType, Type>)
     {
-        _partial_range<Alloc> partial_range(alloc, first);
+        _partial_range<Alloc, Type> partial_range(alloc, first);
         for (; first != last; ++first)
             partial_range.emplace_back(value);
 
@@ -522,12 +523,11 @@ namespace expu {
     }
 
     //Todo: memset for compatible types
-    template<class Type, class Alloc>
-    requires(std::is_constructible_v<_alloc_value_t<Alloc>, Type>)
-    constexpr auto uninitialised_fill_n(Alloc& alloc, _alloc_value_t<Alloc>* first, size_t n, const Type& value)
-        noexcept(std::is_nothrow_constructible_v<_alloc_value_t<Alloc>, Type>)
+    template<class Type, class Alloc, class DestType>
+    constexpr auto uninitialised_fill_n(Alloc& alloc, DestType* first, size_t n, const Type& value)
+        noexcept(std::is_nothrow_constructible_v<DestType, Type>)
     {
-        _partial_range<Alloc> partial_range(alloc, first);
+        _partial_range<Alloc, Type> partial_range(alloc, first);
         while(n--)
             partial_range.emplace_back(value);
 
@@ -548,7 +548,7 @@ namespace expu {
     constexpr OutIt copy(InputIt first, Sentinel last, OutIt output) {
         if constexpr (_actually_trivially<InputIt, OutIt, Sentinel>::assignable) {
             if (!std::is_constant_evaluated())
-                return _range_memmove(first, last, output);
+                return _range_memmove(_unwrapped(first), _unwrapped(last), output);
         }
 
         for (; first != last; ++first, ++output)
@@ -565,42 +565,39 @@ namespace expu {
     {
         return copy(
             std::make_move_iterator(first),
-            std::move_sentinel(last),
+            _make_move_sentinel(last),
             output);
     }
 
     template<
-        std::bidirectional_iterator BiDirIt,
+        class BiDirIt,
         std::sentinel_for<BiDirIt> Sentinel,
         _output_iterator_for<BiDirIt> OutIt>
     constexpr OutIt backward_copy(Sentinel first, BiDirIt last, OutIt output) 
+        requires(std::bidirectional_iterator<_unwrapped_t<BiDirIt>>)
     {
         if constexpr (_actually_trivially<BiDirIt, OutIt, Sentinel>::assignable) {
             if (!std::is_constant_evaluated())
-                return _range_backward_memmove(first, last, output);
+                return _range_backward_memmove(_unwrapped(first), _unwrapped(last), output);
         }
 
         while (first != last)
-            *(--output) = *(--first);
+            *(--output) = *(--last);
 
         return output;
     }
 
     template<
-        std::bidirectional_iterator BiDirIt,
+        class BiDirIt,
         std::sentinel_for<BiDirIt> Sentinel,
         _output_iterator_for<BiDirIt> OutIt>
     constexpr OutIt backward_move(Sentinel first, BiDirIt last, OutIt output) 
+        requires(std::bidirectional_iterator<_unwrapped_t<BiDirIt>>)
     {
-        if constexpr (_actually_trivially<BiDirIt, OutIt, Sentinel>::assignable) {
-            if (!std::is_constant_evaluated())
-                return _range_backward_memmove(first, last, output);
-        }
-
-        while (first != last)
-            *(--output) = std::move(*(--last));
-
-        return output;
+        return backward_copy(
+            _make_move_sentinel(first),
+            std::make_move_iterator(last),
+            output);
     }
 
     template<
@@ -610,8 +607,8 @@ namespace expu {
     constexpr InputIt copy_until_sentinel(InputIt first, OutIt out_first, Sentinel out_last)
     {
         if constexpr (_actually_trivially<InputIt, OutIt>::assignable && std::sized_sentinel_for<Sentinel, OutIt>) {
-            if (!std::is_constant_evaluated())
-                return _range_memmove(first, first + (out_last - out_first), out_first);
+            if (!std::is_constant_evaluated()) 
+                return _range_memmove(_unwrapped(first), _unwrapped(first) + (out_last - out_first), out_first);
         }
 
         for (; out_first != out_last; ++first, ++out_first)
@@ -633,7 +630,7 @@ namespace expu {
         }
         catch (...) {
             std::allocator_traits<Alloc>::deallocate(alloc, output, capacity);
-            output = nullptr;
+            output = nullptr; //Not strictly necessary
             throw;
         }
 
