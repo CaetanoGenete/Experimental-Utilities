@@ -16,7 +16,7 @@ namespace expu {
     using typelist_cast_t = typename typelist_cast<CastTo, TypeList>::type;
 
     template<template<class ...> class CastTo, template<class...> class CastFrom, class ... FromTypes>
-    struct typelist_cast<CastTo, CastFrom<FromTypes...>> 
+    struct typelist_cast<CastTo, CastFrom<FromTypes...>>
     {
         using type = CastTo<FromTypes...>;
     };
@@ -29,7 +29,7 @@ namespace expu {
     constexpr size_t typelist_size_v = typelist_size<TypeList>::value;
 
     template<template<class ...> class TypeList, class ... Args>
-    struct typelist_size<TypeList<Args...>> 
+    struct typelist_size<TypeList<Args...>>
     {
         static constexpr size_t value = sizeof...(Args);
     };
@@ -69,24 +69,24 @@ namespace expu {
     using union_t = typename _union<TypeLists...>::type;
 
     template<
-        template<class ...> class TypeList, 
+        template<class ...> class TypeList,
         template<class ...> class LhsTypeList,
         template<class ...> class RhsTypeList,
-        class ... LhsTypes, 
+        class ... LhsTypes,
         class ... RhsTypes>
     struct union_c<TypeList, LhsTypeList<LhsTypes...>, RhsTypeList<RhsTypes...>>
     {
         using type = TypeList<LhsTypes..., RhsTypes...>;
     };
-    
+
     template<template<class ...> class TypeList, class FirstTypeList, class SecondTypeList, class ... OtherTypeLists>
-    struct union_c<TypeList, FirstTypeList, SecondTypeList, OtherTypeLists...> 
+    struct union_c<TypeList, FirstTypeList, SecondTypeList, OtherTypeLists...>
     {
         using type = union_ct<TypeList, union_ct<TypeList, FirstTypeList, SecondTypeList>, OtherTypeLists...>;
     };
 
     template<template<class ...> class TypeList, class OnlyTypeList>
-    struct union_c<TypeList, OnlyTypeList>: 
+    struct union_c<TypeList, OnlyTypeList>:
         public typelist_cast<TypeList, OnlyTypeList> {};
 
 
@@ -121,7 +121,7 @@ namespace expu {
     using from_typelists_ct = typename from_typelists_c<ResultTypeList, Sequence, TypeLists...>::type;
 
     template<template<class ...> class ResultTypeList, size_t ... Indicies, class ... TypeLists>
-    struct from_typelists_c<ResultTypeList, std::index_sequence<Indicies...>, TypeLists...> 
+    struct from_typelists_c<ResultTypeList, std::index_sequence<Indicies...>, TypeLists...>
     {
         static_assert(sizeof...(Indicies) == sizeof...(TypeLists), "Number of indicies does not match number of type lists!");
 
@@ -141,7 +141,7 @@ namespace expu {
         constexpr size_t tuples_count = (Sizes * ...);
         constexpr std::array bases = { Sizes... };
 
-        constexpr auto _indicies_array = []() {
+        constexpr auto _indicies_array = [=]() {
             std::array<std::array<size_t, bases.size()>, tuples_count> result = {};
 
             for (size_t elem_index = 0; elem_index < tuples_count; ++elem_index) {
@@ -156,11 +156,11 @@ namespace expu {
             return result;
         }();
 
-        constexpr auto row_to_index_sequence = []<size_t row, size_t ... Indicies>(std::index_sequence<Indicies...>) {
+        constexpr auto row_to_index_sequence = [=]<size_t row, size_t ... Indicies>(std::index_sequence<Indicies...>) {
             return std::index_sequence<_indicies_array[row][Indicies]...>{};
         };
 
-        return[]<size_t ... RowIndicies, size_t ... ColumnIndicies>(
+        return[=]<size_t ... RowIndicies, size_t ... ColumnIndicies>(
             std::index_sequence<RowIndicies...>,
             std::index_sequence<ColumnIndicies...> indicies)
         {
@@ -168,7 +168,7 @@ namespace expu {
         }
         (std::make_index_sequence<tuples_count>{}, std::make_index_sequence<sizeof...(Sizes)>{});
     }
-    
+
     template<template<class ...> class TypeList, class SequenceTuple, class ... TypeLists>
     struct _cartesian_product_c_helper;
 
@@ -177,14 +177,14 @@ namespace expu {
     {
         using type = union_t<TypeList<from_typelists_ct<TypeList, Sequences, TypeLists...>>...>;
     };
-    
+
     template<template<class ...> class TypeList, class ... TypeLists>
     struct cartesian_product_c
     {
         using type = typename _cartesian_product_c_helper<
             TypeList, decltype(_cartesian_indicies<typelist_size_v<TypeLists>...>()), TypeLists...>::type;
     };
-    
+
     template<template<class ...> class TypeList, class ... TypeLists>
     using cartesian_product_ct = typename cartesian_product_c<TypeList, TypeLists...>::type;
 
@@ -195,7 +195,7 @@ namespace expu {
     using cartesian_product_t = typename cartesian_product<TypeLists...>::type;
 
     template<template<class ...> class TypeList, class ... FirstTypes,  class ... TypeLists>
-    struct cartesian_product<TypeList<FirstTypes...>, TypeLists...>: 
+    struct cartesian_product<TypeList<FirstTypes...>, TypeLists...>:
         public cartesian_product_c<TypeList, TypeList<FirstTypes...>, TypeLists...> {};
 
 
@@ -229,7 +229,7 @@ namespace expu {
             return sequence;
         }({ Indicies... });
 
-        return[]<size_t ... Indicies2>(std::index_sequence<Indicies2...>) {
+        return [=]<size_t ... Indicies2>(std::index_sequence<Indicies2...>) {
             return std::index_sequence<sequence[Indicies2]...>{};
         }(std::make_index_sequence<sequence.size()>{});
     }
@@ -254,7 +254,7 @@ namespace expu {
         using _typelist_index_seq = std::make_index_sequence<typelist_size_v<TypeList>>;
 
     public:
-        using type = subset_t<decltype(_mask_to_sequence(_typelist_unique_mask<_typelist_index_seq, TypeList>::type())), TypeList>;
+        using type = subset_t<decltype(_mask_to_sequence(typename _typelist_unique_mask<_typelist_index_seq, TypeList>::type())), TypeList>;
     };
 
     template<class Tuple>
@@ -265,7 +265,7 @@ namespace expu {
 
 
     template<template_of<std::tuple> ... Tuples>
-    struct _union<Tuples...> 
+    struct _union<Tuples...>
     {
         using type = decltype(std::tuple_cat(std::declval<Tuples>()...));
     };

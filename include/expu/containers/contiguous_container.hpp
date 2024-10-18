@@ -200,7 +200,7 @@ namespace expu {
             return lhs._ptr <=> rhs._ptr;
         }
 
-        [[nodiscard]] friend constexpr auto operator==(const ctg_const_iterator& lhs, const ctg_const_iterator& rhs)
+        [[nodiscard]] friend constexpr bool operator==(const ctg_const_iterator& lhs, const ctg_const_iterator& rhs)
             noexcept
         {
             lhs._verify_cont_compat(rhs);
@@ -217,7 +217,7 @@ namespace expu {
         _member_ptr_t _ptr;
 #if EXPU_ITERATOR_DEBUG_LEVEL > 0
         _ctg_range_ptr_t _data_ptr;
-#endif 
+#endif
     };
 
     template<class CtgRangePair>
@@ -340,6 +340,7 @@ namespace expu {
         //using iterator_concept  = std::contiguous_iterator_tag;
         using iterator_category = std::random_access_iterator_tag;
         using pointer           = _const_bool_index*;
+        using const_pointer     = const _const_bool_index*;
         using value_type        = bool;
         using reference         = _const_bool_index;
         using difference_type   = std::iter_difference_t<pointer>;
@@ -358,8 +359,8 @@ namespace expu {
             _index(ptr, index) { (void)data; }
 
     public:
-        [[nodiscard]] constexpr reference operator*()  const noexcept { return _index; }
-        [[nodiscard]] constexpr pointer   operator->() const noexcept { return &_index; }
+        [[nodiscard]] constexpr reference     operator*()  const noexcept { return _index; }
+        [[nodiscard]] constexpr const_pointer operator->() const noexcept { return &_index; }
 
         [[nodiscard]] constexpr reference operator[](const difference_type n) const noexcept
         {
@@ -447,7 +448,7 @@ namespace expu {
 
         }
 
-        [[nodiscard]] friend constexpr auto operator==(const _ctg_bool_const_iterator& lhs, const _ctg_bool_const_iterator& rhs)
+        [[nodiscard]] friend constexpr bool operator==(const _ctg_bool_const_iterator& lhs, const _ctg_bool_const_iterator& rhs)
             noexcept
         {
             //lhs._verify_cont_compat(rhs);

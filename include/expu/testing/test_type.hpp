@@ -55,9 +55,9 @@ namespace expu {
 #undef EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD_IF_true
 #undef EXPU_FUND_WRAPPER_BIVARIATE_OVERLOAD
 
-    public: //Comparison functions, Note: cannot default because comparing with potentially difference template arguments. 
+    public: //Comparison functions, Note: cannot default because comparing with potentially difference template arguments.
         template<class OtherFundamentalType>
-        constexpr friend bool operator==(const fundamental_wrapper<FundamentalType>& lhs, const fundamental_wrapper<OtherFundamentalType>& rhs) 
+        constexpr friend bool operator==(const fundamental_wrapper<FundamentalType>& lhs, const fundamental_wrapper<OtherFundamentalType>& rhs)
             noexcept
         {
             return lhs.unwrapped == rhs.unwrapped;
@@ -88,7 +88,7 @@ namespace expu {
         noexcept
     {
         ++wrapper.unwrapped;
-        return *this;
+        return wrapper;
     }
 
     template<class FundamentalType>

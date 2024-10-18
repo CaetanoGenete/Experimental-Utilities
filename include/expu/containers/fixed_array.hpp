@@ -66,12 +66,12 @@ namespace expu
     };
 
     template<class Type, class Alloc = std::allocator<Type>>
-    class fixed_array 
+    class fixed_array
     {
     private:
         using _alloc_traits = std::allocator_traits<Alloc>;
         //Ensure allocator value_type matches the container type
-        static_assert(std::is_same_v<Type, _alloc_traits::value_type>);
+        static_assert(std::is_same_v<Type, typename _alloc_traits::value_type>);
 
     public: //Essential typedefs (Container requirements)
         using allocator_type  = Alloc;
@@ -104,7 +104,7 @@ namespace expu
         {}
 
         constexpr fixed_array(const fixed_array& other, const Alloc& alloc):
-            fixed_array(alloc) 
+            fixed_array(alloc)
         {
             _unallocated_assign(other._first(), other._last(), other.size());
         }
@@ -175,7 +175,7 @@ namespace expu
                 _unallocated_assign(first, last);
         }
 
-        constexpr ~fixed_array() noexcept 
+        constexpr ~fixed_array() noexcept
         {
             _clear_dealloc();
         }
@@ -207,7 +207,7 @@ namespace expu
         template<
             std::forward_iterator InputIt,
             std::sentinel_for<InputIt> Sentinel>
-        constexpr pointer _ctg_duplicate_bits(const InputIt first, const Sentinel last, const size_type range_size) 
+        constexpr pointer _ctg_duplicate_bits(const InputIt first, const Sentinel last, const size_type range_size)
         {
             const size_type alloc_size = right_shift_round_up(range_size, 3);
 
@@ -265,15 +265,15 @@ namespace expu
                     _replace(_ctg_duplicate_bits(first, last, range_size), nullptr, range_size);
                 else
                     set_bits(std::to_address(_first()), first, last);
-            } 
+            }
             else
                 _alt_alloc_assign(_alloc(), first, last);
-            
+
             return *this;
         }
 
     public:
-        constexpr fixed_array& operator=(const fixed_array& other) 
+        constexpr fixed_array& operator=(const fixed_array& other)
         {
             if constexpr (_alloc_traits::propagate_on_container_copy_assignment::value) {
                 if constexpr (!_alloc_traits::is_always_equal::value) {
@@ -328,12 +328,12 @@ namespace expu
         }
 
     public:
-        constexpr const_reference at(const size_type index) const 
+        constexpr const_reference at(const size_type index) const
         {
             //Note: safe to do, non-const version of expu::fixed_array::at is inheritely const
             return static_cast<const_reference>(const_cast<fixed_array&>(*this).at(index));
         }
-        constexpr reference at(const size_type index) 
+        constexpr reference at(const size_type index)
         {
             if (index < _size())
                 return this->operator[](index);
@@ -345,7 +345,7 @@ namespace expu
         constexpr reference       operator[](const size_type index)       noexcept { return _index_operator(index); }
 
     private:
-        constexpr size_type _size() const noexcept 
+        constexpr size_type _size() const noexcept
         {
             if constexpr (_stores_bool)
                 return right_shift_round_up(_data().size, 3);
@@ -354,11 +354,11 @@ namespace expu
         }
 
     public:
-        constexpr size_type size() const noexcept 
+        constexpr size_type size() const noexcept
         {
             if constexpr (_stores_bool)
                 return _data().size;
-            else 
+            else
                 return _size();
         }
 
@@ -386,49 +386,49 @@ namespace expu
 
 
     private: //private member getters
-        constexpr const allocator_type& _alloc() const noexcept 
-        { 
-            return _cpair.first(); 
+        constexpr const allocator_type& _alloc() const noexcept
+        {
+            return _cpair.first();
         }
-        constexpr auto& _alloc() noexcept 
-        { 
+        constexpr auto& _alloc() noexcept
+        {
             return const_cast<allocator_type&>(static_cast<const fixed_array*>(this)->_alloc());
         }
 
-        constexpr const _data_type& _data() const noexcept 
-        { 
-            return _cpair.second(); 
-        
+        constexpr const _data_type& _data() const noexcept
+        {
+            return _cpair.second();
+
         }
-        constexpr auto& _data() noexcept 
-        { 
+        constexpr auto& _data() noexcept
+        {
             return const_cast<_data_type&>(static_cast<const fixed_array*>(this)->_data());
         }
 
-        constexpr const pointer& _first() const noexcept 
-        { 
-            return _cpair.second().first; 
+        constexpr const pointer& _first() const noexcept
+        {
+            return _cpair.second().first;
         }
-        constexpr auto& _first() noexcept 
-        { 
+        constexpr auto& _first() noexcept
+        {
             return const_cast<pointer&>(static_cast<const fixed_array*>(this)->_first());
         }
 
-        constexpr pointer _last() const noexcept requires(_stores_bool) 
-        { 
-            return _first() + _size(); 
+        constexpr pointer _last() const noexcept requires(_stores_bool)
+        {
+            return _first() + _size();
         }
         constexpr pointer _last() noexcept requires(_stores_bool)
-        { 
+        {
             return static_cast<const fixed_array*>(this)->_last();
         }
 
-        constexpr const pointer& _last() const noexcept 
-        { 
-            return _data().last; 
+        constexpr const pointer& _last() const noexcept
+        {
+            return _data().last;
         }
-        constexpr auto& _last() noexcept 
-        { 
+        constexpr auto& _last() noexcept
+        {
             return const_cast<pointer&>(static_cast<const fixed_array*>(this)->_last());
         }
 

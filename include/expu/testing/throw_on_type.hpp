@@ -21,10 +21,10 @@
 
 namespace expu {
 
-    enum class throw_conditions 
+    enum class throw_conditions
     {
-        throw_on_call, 
-        do_not_throw, 
+        throw_on_call,
+        do_not_throw,
         call_do_not_throw
     };
 
@@ -35,7 +35,7 @@ namespace expu {
     };
 
     template<class Base, class Callable>
-    class _trivially_copyable_throw_on: public Base 
+    class _trivially_copyable_throw_on: public Base
     {
     public:
         inline static std::atomic<throw_conditions> condition = throw_conditions::throw_on_call;
@@ -45,7 +45,7 @@ namespace expu {
 
     private:
         template<class Callable2, class ... Args>
-        void _unchecked_try_call(Callable2&& callable, Args&& ... args) 
+        void _unchecked_try_call(Callable2&& callable, Args&& ... args)
         {
             if (condition != throw_conditions::do_not_throw) {
                 const bool marked_to_throw = std::invoke(std::forward<Callable2>(callable), std::forward<Args>(args)...);
@@ -57,7 +57,7 @@ namespace expu {
 
     protected:
         template<class ... TemplateArgs, class Arg>
-        void _try_throw(Arg&& arg) 
+        void _try_throw(Arg&& arg)
             requires _predicate_with_deduced_arg<Callable, Arg, TemplateArgs...>
         {
             //Callable has an argument that needs to be deduced, cast function pointer
@@ -66,19 +66,21 @@ namespace expu {
         }
 
         template<class ... TemplateArgs, class Arg>
-        void _try_throw(Arg&& arg) 
-            requires _predicate_with_deduced_arg<Callable, Arg, decltype(arg), TemplateArgs...>
+        void _try_throw(Arg&& arg)
+            requires
+                (!_predicate_with_deduced_arg<Callable, Arg, TemplateArgs...>) &&
+                _predicate_with_deduced_arg<Callable, Arg, decltype(arg), TemplateArgs...>
         {
             //Template argument doesn't need to be deduced, just pass in.
             _unchecked_try_call(&Callable::template operator()<decltype(arg), TemplateArgs...>, Callable(), std::forward<Arg>(arg));
         }
 
         template<class ... TemplateArgs, class Arg>
-        void _try_throw(Arg&& arg) 
+        void _try_throw(Arg&& arg)
          requires std::predicate<decltype(&Callable::template operator()<TemplateArgs...>), Callable> &&
-                  !_predicate_with_deduced_arg<Callable, Arg, decltype(arg), TemplateArgs...>         &&
-                  !_predicate_with_deduced_arg<Callable, Arg, TemplateArgs...>
-                 
+                  (!_predicate_with_deduced_arg<Callable, Arg, decltype(arg), TemplateArgs...>)       &&
+                  (!_predicate_with_deduced_arg<Callable, Arg, TemplateArgs...>)
+
         {
             _unchecked_try_call(&Callable::template operator()<TemplateArgs...> , Callable());
             //Disables 'unused' warning
@@ -86,7 +88,7 @@ namespace expu {
         }
 
         template<class ... TemplateArgs, class Arg>
-        void _try_throw(Arg&& arg) 
+        void _try_throw(Arg&& arg)
             noexcept(!std::predicate<Callable, Arg> && !std::predicate<Callable>)
         {
             if constexpr (std::predicate<Callable, Arg>) {
@@ -114,7 +116,7 @@ namespace expu {
         _trivially_copyable_throw_on& operator=(_trivially_copyable_throw_on&&) = default;
 
     public:
-        static void reset() 
+        static void reset()
             requires requires { Callable::reset(); }
         {
             Callable::reset();
@@ -134,20 +136,20 @@ namespace expu {
         using _base_type::_base_type;
 
         _throw_on(const _throw_on& other)
-            noexcept(std::is_nothrow_copy_constructible_v<Base> && noexcept(_base_type::template _try_throw<decltype(other)>(*this)))
+            noexcept(std::is_nothrow_copy_constructible_v<Base> && noexcept(_base_type::_try_throw(*this)))
             requires(std::is_copy_constructible_v<Base>) :
             _base_type(other)
         {
-            _base_type::template _try_throw<decltype(other)>(*this);
+            _base_type::_try_throw(*this);
         }
 
         _throw_on(_throw_on&& other)
-            noexcept(std::is_nothrow_move_constructible_v<Base> && noexcept(_base_type::template _try_throw<decltype(other)>(*this)))
+            noexcept(std::is_nothrow_move_constructible_v<Base> && noexcept(_base_type::_try_throw(*this)))
             requires(std::is_move_constructible_v<Base>) :
             _base_type(std::move(other))
         {
             //Note: Since other gets moved from, instead pass current instance
-            _base_type::template _try_throw<decltype(other)>(*this);
+            _base_type::_try_throw(*this);
         }
 
     public:
@@ -168,14 +170,14 @@ namespace expu {
 
 
     template<_uses_throw_on_type ThrowOnType>
-    struct _throw_on_guard 
+    struct _throw_on_guard
     {
         constexpr _throw_on_guard()  noexcept { ThrowOnType::reset(); }
         constexpr ~_throw_on_guard() noexcept { ThrowOnType::reset(); }
     };
 
 
-    struct always_throw 
+    struct always_throw
     {
         template<class ... Args>
         constexpr bool operator()() noexcept {
@@ -185,7 +187,7 @@ namespace expu {
 
 
     template<size_t x, class ... Args>
-    struct throw_after_x 
+    struct throw_after_x
     {
     private:
         inline static std::atomic_size_t _counter = 0;
@@ -193,15 +195,10 @@ namespace expu {
     public:
         template<class ... Args2>
         requires (std::same_as<Args, Args2> && ...)
-        constexpr bool operator()() 
+        bool operator()()
         {
             static size_t counter = 0;
-
-            if (x < ++counter)
-                return true;
-            else
-                return false;
-
+            return x < ++counter;
         }
 
     public:
@@ -210,7 +207,7 @@ namespace expu {
 
 
     template<size_t x>
-    struct always_throw_after_x 
+    struct always_throw_after_x
     {
     private:
         inline static std::atomic_size_t _counter = 0;
@@ -219,10 +216,7 @@ namespace expu {
         template<class ... Args>
         constexpr bool operator()() noexcept
         {
-            if (x < ++_counter)
-                return true;
-            else
-                return false;
+            return x < ++_counter;
         }
 
     public:
@@ -231,7 +225,7 @@ namespace expu {
 
 
     template<size_t x, class ... Args>
-    struct throw_every_x 
+    struct throw_every_x
     {
     private:
         inline static std::atomic_size_t _counter = 0;
@@ -256,7 +250,7 @@ namespace expu {
 
 
     template<class Type, class ... Args>
-    struct throw_on_comp_equal 
+    struct throw_on_comp_equal
     {
     public:
         inline static std::optional<std::decay_t<Type>> value = std::nullopt;

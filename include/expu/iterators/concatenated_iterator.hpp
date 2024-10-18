@@ -51,7 +51,7 @@ namespace expu {
         }
 
     private:
-        constexpr bool _at_end() noexcept 
+        constexpr bool _at_end() noexcept
         {
             return _base_type::_range_index == _iterators_count - 1;
         }
@@ -108,7 +108,7 @@ namespace expu {
 
     template<class ... Iterators>
     constexpr auto concatenate(Iterators&& ... iters) {
-        static constexpr size_t iter_count = sizeof...(Iterators);
+        constexpr size_t iter_count = sizeof...(Iterators);
 
         //If numbe of iterators is odd, do nothing.
         if constexpr (is_odd(iter_count))

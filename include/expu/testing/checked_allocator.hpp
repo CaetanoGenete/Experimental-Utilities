@@ -21,7 +21,7 @@ namespace expu {
         using _init_memory_container = fixed_array<bool>;
 
         //Todo: initalised is only being used for size and index operator, consider providing these functions here
-        struct _memory 
+        struct _memory
         {
             const _checked_allocator_base* owner;
             _init_memory_container initialised;
@@ -42,7 +42,7 @@ namespace expu {
         _checked_allocator_base(_checked_allocator_base&& other) noexcept :
             _allocated_memory(std::move(other._allocated_memory)) {}
 
-        ~_checked_allocator_base() 
+        ~_checked_allocator_base()
         {
             _check_cleared();
         }
@@ -116,10 +116,10 @@ namespace expu {
         using size_type          = typename _alloc_traits::size_type;
         using difference_type    = typename _alloc_traits::difference_type;
 
-        using is_always_equal                        = _alloc_traits::is_always_equal;
-        using propagate_on_container_copy_assignment = _alloc_traits::propagate_on_container_copy_assignment;
-        using propagate_on_container_move_assignment = _alloc_traits::propagate_on_container_move_assignment;
-        using propagate_on_container_swap            = _alloc_traits::propagate_on_container_swap;
+        using is_always_equal                        = typename _alloc_traits::is_always_equal;
+        using propagate_on_container_copy_assignment = typename _alloc_traits::propagate_on_container_copy_assignment;
+        using propagate_on_container_move_assignment = typename _alloc_traits::propagate_on_container_move_assignment;
+        using propagate_on_container_swap            = typename _alloc_traits::propagate_on_container_swap;
 
     public: //Constructors and destructor
         using _checked_allocator_base::_allocated_memory;
@@ -127,7 +127,7 @@ namespace expu {
         template<class ... Args>
         requires(std::is_constructible_v<Allocator, Args...>)
         _checked_allocator(Args&& ... args) :
-            Allocator(std::forward<Args>(args)...), 
+            Allocator(std::forward<Args>(args)...),
             _checked_allocator_base() {}
 
         template<class OtherAllocator>
@@ -136,11 +136,11 @@ namespace expu {
             _checked_allocator_base(other) {}
 
         _checked_allocator(const _checked_allocator& other) noexcept:
-            Allocator(other), 
+            Allocator(other),
             _checked_allocator_base(other) {}
 
         _checked_allocator(_checked_allocator&& other) noexcept:
-            Allocator(std::move(other)), 
+            Allocator(std::move(other)),
             _checked_allocator_base(std::move(other)) {}
 
         _checked_allocator select_on_container_copy_construction() const
@@ -177,7 +177,7 @@ namespace expu {
         }
 
     public:
-        bool _comp_equal(const _checked_allocator_base* other) noexcept override 
+        bool _comp_equal(const _checked_allocator_base* other) noexcept override
         {
             if (typeid(*other) == typeid(*this))
                 return static_cast<const _checked_allocator&>(*other) == *this;
@@ -201,7 +201,7 @@ namespace expu {
         [[nodiscard]] pointer allocate(const size_type n, const_void_pointer hint = nullptr)
         {
             pointer result = _alloc_traits::allocate(*this, n, hint);
-            //Add memory block 
+            //Add memory block
             _allocated_memory->try_emplace(std::to_address(result), this, _byte_size(n));
             return result;
         }
@@ -316,7 +316,7 @@ namespace expu {
                     return false;
                 }
             }
-            
+
             throw std::out_of_range("Some or all of the objects being checked are not within memory allocated by allocator.");
         }
 

@@ -4,6 +4,9 @@ build
 #Avoid pushing dependencies
 deps
 
+# clangd cache
+.cache
+
 #Avoid pushing non-essential images
 docs/**.png
 docs/**.jpg
