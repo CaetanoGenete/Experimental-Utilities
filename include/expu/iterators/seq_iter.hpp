@@ -18,7 +18,6 @@ namespace expu {
         using difference_type   = DiffType;
 
     public:
-
         constexpr seq_iter() noexcept : _curr() {}
 
         constexpr seq_iter(IntType value)
@@ -30,12 +29,10 @@ namespace expu {
         constexpr ~seq_iter() noexcept = default;
 
     public:
-
         constexpr seq_iter& operator=(const seq_iter&) = default;
         constexpr seq_iter& operator=(seq_iter&&) noexcept = default;
 
     public:
-
         [[nodiscard]] constexpr reference operator*() const noexcept {
             return _curr;
         }
@@ -44,12 +41,20 @@ namespace expu {
             return &_curr;
         }
 
-        [[nodiscard]] constexpr value_type operator[](difference_type n) const noexcept {
+#ifndef EXPU_MAKE_SEQ_ITER_RANDOM_ACCESS
+        [[nodiscard]] constexpr value_type operator[](const difference_type n) const noexcept {
             return static_cast<value_type>(_curr + n);
         }
+#else
+        [[nodiscard]] constexpr reference operator[](const difference_type n) const noexcept {
+            place_holder = return static_cast<value_type>(_curr + n);
+            return place_holder;
+        }
+#endif // !EXPU_MAKE_SEQ_ITER_RANDOM_ACCESS
+
+
 
     public:
-
         constexpr seq_iter& operator++() noexcept {
             ++_curr;
             return *this;
@@ -57,7 +62,7 @@ namespace expu {
 
         [[nodiscard("Prefer pre-increment operator.")]] 
         constexpr seq_iter operator++(int) noexcept {
-            seq_iter copy = _curr;
+            const seq_iter copy = _curr;
             ++_curr;
             return copy;
         }
@@ -69,25 +74,23 @@ namespace expu {
 
         [[nodiscard("Prefer pre-increment operator.")]] 
         constexpr seq_iter operator--(int) noexcept {
-            seq_iter copy = _curr;
+            const seq_iter copy = _curr;
             --_curr;
             return copy;
         }
 
     public:
-
-        constexpr seq_iter& operator+=(difference_type n) noexcept {
+        constexpr seq_iter& operator+=(const difference_type n) noexcept {
             _curr += n;
             return *this;
         }
 
-        constexpr seq_iter& operator-=(difference_type n) noexcept {
+        constexpr seq_iter& operator-=(const difference_type n) noexcept {
             _curr -= n;
             return *this;
         }
 
     public:
-
         constexpr void swap(seq_iter& other)
             noexcept(std::is_nothrow_swappable_v<IntType>)
         {
@@ -97,6 +100,10 @@ namespace expu {
 
     private:
         mutable value_type _curr;
+#ifdef EXPU_MAKE_SEQ_ITER_RANDOM_ACCESS
+        value_type place_holder;
+#endif // EXPU_MAKE_SEQ_ITER_RANDOM_ACCESS
+
     };
 
     template<class IntType, class DiffType>
@@ -119,30 +126,30 @@ namespace expu {
     }
 
     template<class IntType, class DiffType>
-    constexpr seq_iter<IntType, DiffType> operator+(seq_iter<IntType, DiffType> lhs, DiffType n) noexcept
+    constexpr auto operator+(seq_iter<IntType, DiffType> lhs, const std::iter_difference_t<seq_iter<IntType, DiffType>> n) noexcept
     {
         lhs += n;
         return lhs;
     }
 
     template<class IntType, class DiffType>
-    constexpr seq_iter<IntType, DiffType> operator+(DiffType n, seq_iter<IntType, DiffType> rhs) noexcept
+    constexpr auto operator+(const std::iter_difference_t<seq_iter<IntType, DiffType>> n, seq_iter<IntType, DiffType> rhs) noexcept
     {
         rhs += n;
         return rhs;
     }
 
     template<class IntType, class DiffType>
-    constexpr seq_iter<IntType, DiffType> operator-(seq_iter<IntType, DiffType> lhs, DiffType n) noexcept
+    constexpr auto operator-(seq_iter<IntType, DiffType> lhs, const std::iter_difference_t<seq_iter<IntType, DiffType>> n) noexcept
     {
         lhs -= n;
         return lhs;
     }
 
     template<class IntType, class DiffType>
-    constexpr DiffType operator-(const seq_iter<IntType, DiffType>& lhs, const seq_iter<IntType, DiffType>& rhs) noexcept
+    constexpr auto operator-(const seq_iter<IntType, DiffType>& lhs, const seq_iter<IntType, DiffType>& rhs) noexcept
     {
-        return *lhs - *rhs;
+        return static_cast<seq_iter<IntType, DiffType>::difference_type>(*lhs - *rhs);
     }
 
 }

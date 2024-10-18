@@ -7,11 +7,125 @@
 
 #include <memory>
 #include <type_traits>
-#include <string_view>
 #include <string>
 #include <sstream>
 
 namespace expu_tests {
+
+    template<typename ... Args>
+    [[nodiscard]] constexpr std::string arg_list_str()
+    {
+        std::string result = ((expu::type_name<Args>() + ",") + ...);
+
+        if constexpr(sizeof...(Args) > 0)
+            return result.substr(0, result.size() - 1);
+        else
+            return result;
+    }
+
+    class calls_counter
+    {
+    public:
+        using mapped_type = size_t;
+        using key_type    = std::string;
+
+    public:
+        constexpr calls_counter(): _map() {}
+    
+    public: //Indexing functions
+        constexpr mapped_type get(const std::string& arg_list) const
+        {
+            const auto loc = _map.find(arg_list);
+
+            if (loc == _map.cend())
+                return 0;
+            else
+                return loc->second;
+        }
+
+        template<typename ... Args>
+        constexpr mapped_type get() const
+        {
+            return get(arg_list_str<Args...>());
+        }
+
+    public: //Erasior functions
+        template<typename ... Args>
+        constexpr void erase()
+        {
+            _map.erase(arg_list_str<Args...>());
+        }
+    
+    public: //Counter alteration functions
+        template<typename ... Args>
+        constexpr calls_counter& add(mapped_type count = 1)
+        {
+            const std::string key = arg_list_str<Args...>();
+            const auto loc = _map.find(key);
+
+            if (loc == _map.end())
+                _map[key] = count;
+            else
+                loc->second += count;
+
+            return *this;
+        }
+
+        template<typename ... Args>
+        constexpr calls_counter& reset()
+        {
+            const std::string key = arg_list_str<Args...>();
+            const auto loc = _map.find(key);
+
+            if (loc != _map.end())
+                loc->second = 0;
+
+            return *this;
+        }
+
+    public:
+        [[nodiscard]] constexpr auto begin()  const { return _map.cbegin(); }
+        [[nodiscard]] constexpr auto cbegin() const { return _map.cbegin(); }
+
+        [[nodiscard]] constexpr auto end()  const { return _map.cend(); }
+        [[nodiscard]] constexpr auto cend() const { return _map.cend(); }
+
+    private:
+        expu::linear_map<std::string, size_t> _map;
+    };
+
+    struct alloc_counters
+    {
+    public:
+        static constexpr size_t do_not_check = std::numeric_limits<size_t>::max();
+
+    public:
+        using map_type = calls_counter;
+
+    public:
+        size_t copy_ctor_calls  = do_not_check;
+        size_t move_ctor_calls  = do_not_check;
+        size_t destructor_calls = do_not_check;
+
+        size_t allocations   = do_not_check;
+        size_t deallocations = do_not_check;
+
+        map_type calls;
+
+    public:
+        //Todo: Consider making non-member
+        constexpr size_t ctor_calls() const noexcept 
+        {
+            size_t total = 0;
+
+            if (copy_ctor_calls != do_not_check)
+                total += copy_ctor_calls;
+            if (move_ctor_calls != do_not_check)
+                total += move_ctor_calls;
+
+            return total;
+        }
+    };
 
     template<typename Allocator>
     struct counted_allocator : public Allocator 
@@ -19,9 +133,9 @@ namespace expu_tests {
     private:
         using _alloc_traits = std::allocator_traits<Allocator>;
 
-        using _map_type = expu::linear_map<std::string_view, size_t>;
-
     public:
+        using map_type = calls_counter;
+
         using pointer            = typename _alloc_traits::pointer;
         using const_pointer      = typename _alloc_traits::const_pointer;
         using void_pointer       = typename _alloc_traits::void_pointer;
@@ -36,50 +150,34 @@ namespace expu_tests {
         using propagate_on_container_swap            = _alloc_traits::propagate_on_container_swap;
 
     public:
-        struct data_type 
-        {
-            size_type copy_ctor_calls;
-            size_type move_ctor_calls;
-            size_type destructor_calls;
-
-            size_type allocations;
-            size_type deallocations;
-
-            _map_type calls;
-        };
-
-    public:
         template<typename ... Args>
         constexpr counted_allocator(Args&& ... args)
             noexcept(std::is_nothrow_constructible_v<Allocator, Args...> &&
-                     std::is_nothrow_default_constructible_v<_map_type>):
+                     std::is_nothrow_default_constructible_v<map_type>):
             Allocator(std::forward<Args>(args)...),
             _data{ 0, 0, 0, 0, 0 } {}
 
     public:
         [[nodiscard]] constexpr auto allocate(size_type n, const_void_pointer hint = nullptr) 
         {
+            auto result = _alloc_traits::allocate(*this, n, hint);
             ++_data.allocations;
-            return _alloc_traits::allocate(*this, n, hint);
+            return result;
         }
 
-        constexpr auto deallocate(pointer pointer, size_type n)
+        constexpr void deallocate(pointer pointer, size_type n)
         {
+            _alloc_traits::deallocate(*this, pointer, n);
             ++_data.deallocations;
-            return _alloc_traits::deallocate(*this, pointer, n);
         }
 
-    private:
-        template<typename ... Args>
-        [[nodiscard]] constexpr std::string _arg_list_str() const 
-        {
-            return ((expu::type_name<Args>() + ",") + ...);
-        }
 
     public:
         template<typename Type, typename ... Args>
-        constexpr auto construct(Type* xp, Args&& ... args) 
+        constexpr void construct(Type* xp, Args&& ... args) 
         {
+            _alloc_traits::construct(*this, xp, std::forward<Args>(args)...);
+
             if constexpr (sizeof...(Args) == 1) {
 
                 if constexpr (expu::calls_move_ctor_v<Type, decltype(args)...>) {
@@ -91,17 +189,14 @@ namespace expu_tests {
 
             }
 
-            ++_data.calls[_arg_list_str<decltype(args)...>()];
-
-            //Note void return type deduced if relevant.
-            return _alloc_traits::construct(*this, xp, std::forward<Args>(args)...);
+            _data.calls.add<decltype(args)...>();
         }
 
         template<typename Type>
-        constexpr auto destroy(Type* xp) 
+        constexpr void destroy(Type* xp) 
         {
+            _alloc_traits::destroy(*this, xp);
             ++_data.destructor_calls;
-            return _alloc_traits::destroy(*this, xp);
         }
 
     public:
@@ -118,51 +213,34 @@ namespace expu_tests {
         [[nodiscard]] constexpr size_type allocations()   const noexcept { return _data.allocations; }
         [[nodiscard]] constexpr size_type deallocations() const noexcept { return _data.deallocations; }
 
-
-        [[nodiscard]] constexpr size_type calls_count(std::string_view arg_list) const
-        {
-            return _data.calls[arg_list];
-        }
-
-        [[nodiscard]] constexpr size_type calls_count(std::string_view arg_list)
-        {
-            //Note: looks identical to above override. However,
-            //here the non-const overload of Container::operator[]
-            //is called.
-            return _data.calls[arg_list];
-        }
-
         template<typename ... Args>
         [[nodiscard]] constexpr size_type calls_count() const
         {
-            return calls_count(_arg_list_str<Args...>());
+            return _data.calls.get<Args...>();
         }
 
-        template<typename ... Args>
-        [[nodiscard]] constexpr size_type calls_count()
+        [[nodiscard]] constexpr size_type calls_count(const std::string& arg_list) const
         {
-            //Note: looks identical to above override. However,
-            //here the non-const overload of Container::operator[]
-            //is called.
-            return calls_count(_arg_list_str<Args...>());
+            return _data.calls.get(arg_list);
         }
 
     public: //data getters
-        [[nodiscard]] constexpr data_type data() const { return _data; }
+        [[nodiscard]] constexpr alloc_counters data() const { return _data; }
 
     private:
-        data_type _data;
+        alloc_counters _data;
     };    
 
 
     template<typename Allocator>
     inline constexpr std::string check_counters(
         const counted_allocator<Allocator>& alloc,
-        const typename counted_allocator<Allocator>::data_type& change,
-        const typename counted_allocator<Allocator>::data_type& expected)
+        const alloc_counters& change,
+        const alloc_counters& expected)
     {
-//Helper macro for check_counters function. MACRO is dependant on function parameter names!
-#define EXPU_TESTS_CHECK_DIFFERENCE(variable) if((alloc.variable() - change.variable) != expected.variable)
+//Helper macro for check_counters function. IMPORTANT: Macro is dependant on function parameter names!
+#define EXPU_TESTS_CHECK_DIFFERENCE(variable) \
+        if((alloc.variable() - change.variable) != expected.variable && expected.variable != alloc_counters::do_not_check)
 
         std::stringstream ss;
 
@@ -170,9 +248,9 @@ namespace expu_tests {
         //within expected.
         for (const auto& pair : expected.calls)
         {
-            auto [key, count] = pair;
+            auto& [key, count] = pair;
             
-            if ((alloc.calls_count(key) - change.calls[key]) != count) {
+            if ((alloc.calls_count(key) - change.calls.get(key)) != count) {
                 ss << "Unexpected calls to: ";
                 ss << typeid(expu::_alloc_value_t<Allocator>).name();
                 ss << "(" << key << ").\n";
@@ -193,7 +271,7 @@ namespace expu_tests {
     template<typename Allocator>
     inline constexpr std::string check_counters(
         const counted_allocator<Allocator>& alloc,
-        const typename counted_allocator<Allocator>::data_type& expected)
+        const alloc_counters& expected)
     {
         //Note: calls field is automatically defaulted to be an empty map.
         return check_counters(alloc, { 0, 0, 0, 0, 0 }, expected);

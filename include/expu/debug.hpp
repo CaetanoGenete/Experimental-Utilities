@@ -3,15 +3,15 @@
 
 #include <iostream>
 
-#ifndef SMM_DEBUG_LEVEL
-#define SMM_DEBUG_LEVEL 0
+#ifndef EXPU_DEBUG_LEVEL
+#define EXPU_DEBUG_LEVEL 0
 #endif // !CESS_DEBUG_LEVEL
 
 #ifndef EXPU_ITERATOR_DEBUG_LEVEL
-#define EXPU_ITERATOR_DEBUG_LEVEL SMM_DEBUG_LEVEL
+#define EXPU_ITERATOR_DEBUG_LEVEL EXPU_DEBUG_LEVEL
 #endif // !SMM_ITERATOR_DEBUG_LEVEL
 
-#define SMM_VERIFY(condition, message)                                              \
+#define EXPU_VERIFY(condition, message)                                             \
 {                                                                                   \
     if (!(condition)) {                                                             \
         std::cerr << __FILE__ << " " << __func__ << " line: " << __LINE__ << "\n";  \
@@ -21,10 +21,10 @@
 }
 
 #ifndef NDEBUG
-#define SMM_VERIFY_DEBUG(condition, message) \
-    SMM_VERIFY(condition, message)
+#define EXPU_VERIFY_DEBUG(condition, message) \
+    EXPU_VERIFY(condition, message)
 #else
-#define SMM_VERIFY_DEBUG(condition, message)
+#define EXPU_VERIFY_DEBUG(condition, message)
 #endif // !NDEBUG
 
-#endif // !SMM_DEBUG_HPP_INCLUDED
+#endif // !EXPU_DEBUG_HPP_INCLUDED
